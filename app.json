@@ -1,0 +1,68 @@
+{
+  "expo": {
+    "name": "Verida",
+    "slug": "veridaapp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.verida.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#153C46",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.verida.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-secure-store",
+      "expo-font",
+      "expo-sharing",
+      "expo-image",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "backgroundColor": "#153C46"
+        }
+      ]
+    ],
+    "scheme": "verida",
+    "experiments": {
+      "typedRoutes": true
+    },
+    "backgroundColor": "#F7F6F0",
+    "primaryColor": "#237C78",
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "0bb37f94-8f9a-47c3-b404-0211d1b4f3dc"
+      }
+    },
+    "owner": "veridaapp",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/0bb37f94-8f9a-47c3-b404-0211d1b4f3dc"
+    }
+  }
+}

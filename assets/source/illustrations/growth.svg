@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240"><defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#EEF6F3"/><stop offset="1" stop-color="#CDE5DE"/></linearGradient>
+<linearGradient id="teal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2F968E"/><stop offset="1" stop-color="#237C78"/></linearGradient>
+<linearGradient id="deep" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#21596A"/><stop offset="1" stop-color="#153C46"/></linearGradient>
+<linearGradient id="coral" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F2B79C"/><stop offset="1" stop-color="#E69A7A"/></linearGradient>
+<linearGradient id="paper" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#F3F1E8"/></linearGradient></defs>
+<circle cx="120" cy="120" r="108" fill="url(#bg)"/>
+<ellipse cx="120" cy="190" rx="66" ry="8" fill="#153C46" opacity="0.1"/>
+
+    <rect x="58" y="128" width="30" height="60" rx="8" fill="url(#deep)"/>
+    <rect x="104" y="102" width="30" height="86" rx="8" fill="url(#teal)"/>
+    <rect x="150" y="72" width="30" height="116" rx="8" fill="url(#coral)"/>
+    <path d="M56 100 L100 72 L128 82 L176 40" fill="none" stroke="#153C46" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M158 40 H178 V60" fill="none" stroke="#153C46" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>

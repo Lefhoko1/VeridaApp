@@ -1,0 +1,83 @@
+# Supabase CLI configuration for local development.
+project_id = "verida"
+
+[api]
+enabled = true
+port = 54321
+# Every module schema the client reaches through PostgREST. On a hosted project, set the same
+# list under Project Settings > API > Exposed schemas, or requests fail with "schema must be one of".
+schemas = ["identity", "authz", "platform", "business", "records", "operations", "analytics", "learning", "assistant", "notifications"]
+extra_search_path = ["extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 17
+
+[db.seed]
+enabled = false
+
+[functions.ask-verida]
+import_map = "./functions/import_map.json"
+
+[functions.generate-lesson]
+import_map = "./functions/import_map.json"
+
+[functions.dispatch-email]
+import_map = "./functions/import_map.json"
+# Only drains the email queue, and the scheduler has no user to authenticate as.
+verify_jwt = false
+
+[studio]
+enabled = true
+port = 54323
+
+[local_smtp]
+enabled = true
+port = 54324
+
+[auth]
+enabled = true
+site_url = "verida://"
+additional_redirect_urls = ["verida://**"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+enable_signup = true
+minimum_password_length = 8
+password_requirements = "lower_upper_letters_digits"
+
+[auth.email]
+enabled = true
+double_confirm_changes = true
+# FR-A05 to FR-A07: accounts stay inactive until the emailed code is entered.
+enable_confirmations = true
+secure_password_change = false
+otp_length = 6
+otp_expiry = 3600
+
+# Resend. The key comes from the environment and must never be written in this file:
+#   RESEND_API_KEY=... npx supabase config push
+# onboarding@resend.dev only delivers to the Resend account's own address. Change admin_email
+# to an address on a verified domain before inviting real users.
+[auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 465
+user = "resend"
+pass = "env(RESEND_API_KEY)"
+admin_email = "onboarding@resend.dev"
+sender_name = "Verida"
+
+# The app verifies emailed one-time codes rather than deep links, so these templates must
+# present {{ .Token }}. Supabase refuses template changes on free-tier projects without custom SMTP.
+[auth.email.template.confirmation]
+subject = "Your Verida verification code"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "Reset your Verida password"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.email_change]
+subject = "Confirm your new Verida email address"
+content_path = "./supabase/templates/email_change.html"

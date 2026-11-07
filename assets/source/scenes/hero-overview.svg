@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 640" width="1240" height="640"><defs>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#153C46"/><stop offset="0.55" stop-color="#1C5560"/><stop offset="1" stop-color="#237C78"/></linearGradient>
+  <radialGradient id="glow"><stop offset="0" stop-color="#F6C9AE" stop-opacity="0.75"/><stop offset="0.45" stop-color="#E69A7A" stop-opacity="0.24"/><stop offset="1" stop-color="#E69A7A" stop-opacity="0"/></radialGradient>
+  <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F8D2BB"/><stop offset="1" stop-color="#E69A7A"/></linearGradient>
+  <filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.55 0"/></filter></defs>
+  <rect width="1240" height="640" fill="url(#sky)"/>
+  <circle cx="1078" cy="300" r="217" fill="url(#glow)"/>
+  <circle cx="1078" cy="300" r="70" fill="url(#sun)"/>
+  <path d="M0 640 L0 380 C103.33333333333333 380 103.33333333333333 400 206.66666666666666 400 C310 400 310 372 413.3333333333333 372 C516.6666666666666 372 516.6666666666666 342 620 342 C723.3333333333333 342 723.3333333333333 352 826.6666666666666 352 C930 352 930 322 1033.3333333333333 322 C1136.6666666666665 322 1136.6666666666665 340 1240 340 L1240 640Z" fill="#2B7F7B"/><path d="M0 640 L0 470 C103.33333333333333 470 103.33333333333333 472 206.66666666666666 472 C310 472 310 448 413.3333333333333 448 C516.6666666666666 448 516.6666666666666 424 620 424 C723.3333333333333 424 723.3333333333333 410 826.6666666666666 410 C930 410 930 438 1033.3333333333333 438 C1136.6666666666665 438 1136.6666666666665 400 1240 400 L1240 640Z" fill="#1F6A6B"/><path d="M0 640 L0 570 C103.33333333333333 570 103.33333333333333 556 206.66666666666666 556 C310 556 310 548 413.3333333333333 548 C516.6666666666666 548 516.6666666666666 506 620 506 C723.3333333333333 506 723.3333333333333 530 826.6666666666666 530 C930 530 930 498 1033.3333333333333 498 C1136.6666666666665 498 1136.6666666666665 520 1240 520 L1240 640Z" fill="#184C57"/>
+  <g transform="translate(1012 516)" fill="#153C46" stroke="#153C46">
+    <path d="M-4.5 0 C-2.7 -27 -2.7 -45 -1.8 -63 L3.6 -63 C3.6 -45 4.5 -27 6.3 0Z" stroke="none"/>
+    <g fill="none" stroke-width="2.7" stroke-linecap="round">
+      <path d="M0 -46.800000000000004 C-10.8 -59.4 -27 -68.4 -46.800000000000004 -73.8"/>
+      <path d="M0.9 -52.2 C12.6 -63 27 -70.2 45 -75.60000000000001"/>
+      <path d="M0 -61.2 C-5.4 -68.4 -12.6 -73.8 -19.8 -79.2"/>
+      <path d="M0.9 -61.2 C5.4 -68.4 12.6 -73.8 18 -79.2"/>
+    </g>
+    <g stroke="none">
+      <ellipse cx="-39.6" cy="-79.2" rx="32.4" ry="8.1"/>
+      <ellipse cx="36" cy="-81" rx="36" ry="9"/>
+      <ellipse cx="-3.6" cy="-88.2" rx="41.4" ry="9.9"/>
+    </g>
+  </g>
+  <rect width="1240" height="640" filter="url(#grain)" opacity="0.05"/>
+</svg>

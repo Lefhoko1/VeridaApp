@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240"><defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#EEF6F3"/><stop offset="1" stop-color="#CDE5DE"/></linearGradient>
+<linearGradient id="teal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2F968E"/><stop offset="1" stop-color="#237C78"/></linearGradient>
+<linearGradient id="deep" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#21596A"/><stop offset="1" stop-color="#153C46"/></linearGradient>
+<linearGradient id="coral" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F2B79C"/><stop offset="1" stop-color="#E69A7A"/></linearGradient>
+<linearGradient id="paper" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#F3F1E8"/></linearGradient></defs>
+<circle cx="120" cy="120" r="108" fill="url(#bg)"/>
+<ellipse cx="120" cy="190" rx="66" ry="8" fill="#153C46" opacity="0.1"/>
+
+    <path d="M52 70 a18 18 0 0 1 18 -18 h78 a18 18 0 0 1 18 18 v44 a18 18 0 0 1 -18 18 h-58 l-24 20 v-20 a14 14 0 0 1 -14 -14Z" fill="url(#teal)"/>
+    <circle cx="86" cy="92" r="7" fill="#FFFFFF"/><circle cx="109" cy="92" r="7" fill="#FFFFFF"/><circle cx="132" cy="92" r="7" fill="#FFFFFF"/>
+    <path d="M196 124 a14 14 0 0 0 -14 -14 h-60 a14 14 0 0 0 -14 14 v32 a14 14 0 0 0 14 14 h42 l20 16 v-16 a12 12 0 0 0 12 -12Z" fill="url(#paper)"/>
+    <path d="M152 126 Q154.52 137.48 166 140 Q154.52 142.52 152 154 Q149.48 142.52 138 140 Q149.48 137.48 152 126Z" fill="#E69A7A"/></svg>

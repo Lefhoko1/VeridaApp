@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 640" width="1240" height="640"><defs>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#153C46"/><stop offset="0.6" stop-color="#237C78"/><stop offset="1" stop-color="#4FA696"/></linearGradient>
+  <radialGradient id="glow"><stop offset="0" stop-color="#F6C9AE" stop-opacity="0.75"/><stop offset="0.45" stop-color="#E69A7A" stop-opacity="0.24"/><stop offset="1" stop-color="#E69A7A" stop-opacity="0"/></radialGradient>
+  <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F8D2BB"/><stop offset="1" stop-color="#E69A7A"/></linearGradient>
+  <filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.55 0"/></filter></defs>
+  <rect width="1240" height="640" fill="url(#sky)"/>
+  <circle cx="1010" cy="190" r="285.2" fill="url(#glow)"/>
+  <circle cx="1010" cy="190" r="92" fill="url(#sun)"/>
+  <path d="M0 640 L0 500 C103.33333333333333 500 103.33333333333333 470 206.66666666666666 470 C310 470 310 480 413.3333333333333 480 C516.6666666666666 480 516.6666666666666 430 620 430 C723.3333333333333 430 723.3333333333333 420 826.6666666666666 420 C930 420 930 440 1033.3333333333333 440 C1136.6666666666665 440 1136.6666666666665 400 1240 400 L1240 640Z" fill="#237C78"/><path d="M0 640 L0 580 C103.33333333333333 580 103.33333333333333 560 206.66666666666666 560 C310 560 310 560 413.3333333333333 560 C516.6666666666666 560 516.6666666666666 520 620 520 C723.3333333333333 520 723.3333333333333 510 826.6666666666666 510 C930 510 930 500 1033.3333333333333 500 C1136.6666666666665 500 1136.6666666666665 490 1240 490 L1240 640Z" fill="#1A5A62"/>
+  <path d="M720 640 C820 590 760 540 860 516 C940 496 900 462 960 442" fill="none" stroke="#DCECE7" stroke-width="10" stroke-linecap="round" stroke-dasharray="1 26" opacity="0.8"/><circle cx="972" cy="432" r="11" fill="#E69A7A"/>
+  <rect width="1240" height="640" filter="url(#grain)" opacity="0.05"/>
+</svg>
