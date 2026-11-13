@@ -86,6 +86,8 @@ The same code is both the phone app and the website, so a fix or feature reaches
 3. Upload `dist/` to any static host, such as Netlify, Vercel, Cloudflare Pages or EAS Hosting (`npx eas deploy`).
 4. Send every unknown path to `/index.html`, because the site is a single page app and addresses like `/sign-in` exist only in the browser. Without this, refreshing any page other than the home page shows the host's "not found" page.
 
+On Vercel, [vercel.json](vercel.json) already sets the build, the output folder and the rule in step 4. Import the GitHub repository as a new Vercel project and add the two `EXPO_PUBLIC_` variables under Settings > Environment Variables. Vercel then publishes `main` on every push, and gives each other branch a preview address.
+
 Use code that is different on the web only where a browser truly behaves differently, through `Platform.OS === 'web'` or a `.web.ts` file, as `core/storage/keyValueStore.ts` and `core/export/shareFile.ts` do.
 
 ## Commands
