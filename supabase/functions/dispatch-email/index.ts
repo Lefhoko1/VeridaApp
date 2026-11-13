@@ -5,7 +5,7 @@ import { json } from '../_shared/http.ts';
 import { reportEvent, serviceClient } from '../_shared/supabase.ts';
 
 const BATCH_SIZE = 20;
-const DEFAULT_FROM = 'Verida <onboarding@resend.dev>';
+const DEFAULT_FROM = 'Verida <no-reply@vinabbie.com>';
 
 const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 

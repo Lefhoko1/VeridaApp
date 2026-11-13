@@ -57,15 +57,15 @@ otp_expiry = 3600
 
 # Resend. The key comes from the environment and must never be written in this file:
 #   RESEND_API_KEY=... npx supabase config push
-# onboarding@resend.dev only delivers to the Resend account's own address. Change admin_email
-# to an address on a verified domain before inviting real users.
+# admin_email must be on a domain verified in Resend (vinabbie.com); otherwise Resend only
+# delivers to the Resend account's own address.
 [auth.email.smtp]
 enabled = true
 host = "smtp.resend.com"
 port = 465
 user = "resend"
 pass = "env(RESEND_API_KEY)"
-admin_email = "onboarding@resend.dev"
+admin_email = "no-reply@vinabbie.com"
 sender_name = "Verida"
 
 # The app verifies emailed one-time codes rather than deep links, so these templates must

@@ -44,7 +44,7 @@ Administrative requirements are complete, but nobody can use them until a first 
 | FR-H09 Email delivery | A Resend API key set as a Supabase secret. The dispatch job has been scheduled since 2026-11-03 | In-app delivery works and is recorded. Emails wait in the queue |
 | FR-H04 Learning reminders | A first run to confirm. The daily job has been scheduled since 2026-11-03, and had not yet run when checked on 2026-11-04 | The function that sends them is built and tested |
 
-Real users also need a verified domain in Resend, because the test sender only delivers to the Resend account's own address.
+Emails are sent from `no-reply@vinabbie.com`, verified in Resend on 2026-11-13. Sign-up codes reached an outside address the same day. Notification emails (FR-H09) still need a first real delivery to confirm.
 
 ## Notes on how some requirements are met
 
