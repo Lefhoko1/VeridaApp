@@ -9,11 +9,14 @@ import { SessionProvider, useCurrentUser, useSession } from './useSession';
 
 const USER: Session = { userId: 'user-1', email: 'neo@example.com' };
 
-function setup(initial: Session | null) {
+function setup(initial: Session | null | Error) {
   let emit: (session: Session | null) => void = () => undefined;
   const unsubscribe = jest.fn();
   const auth = {
-    getSession: jest.fn(async () => initial),
+    getSession: jest.fn(async () => {
+      if (initial instanceof Error) throw initial;
+      return initial;
+    }),
     onSessionChange: jest.fn((listener: (session: Session | null) => void) => {
       emit = listener;
       return unsubscribe;
@@ -27,7 +30,7 @@ function setup(initial: Session | null) {
       </AccountDependenciesProvider>
     </QueryClientProvider>
   );
-  return { wrapper, queryClient, unsubscribe, emit: (session: Session | null) => emit(session) };
+  return { wrapper, queryClient, unsubscribe, auth, emit: (session: Session | null) => emit(session) };
 }
 
 describe('session', () => {
@@ -42,6 +45,34 @@ describe('session', () => {
     const { wrapper } = setup(null);
     const { result } = await renderHook(() => useSession(), { wrapper });
     await waitFor(() => expect(result.current.status).toBe('signed-out'));
+  });
+
+  // A stored account whose refresh failed comes back once the network does, so showing sign-in
+  // would let someone register while the previous account is about to reappear.
+  it('does not report signed out when the stored session cannot be checked', async () => {
+    const { wrapper } = setup(new Error('network'));
+    const { result } = await renderHook(() => useSession(), { wrapper });
+    await waitFor(() => expect(result.current.status).toBe('unavailable'));
+  });
+
+  it('checks the stored session again on retry', async () => {
+    const { wrapper, auth } = setup(new Error('network'));
+    const { result } = await renderHook(() => useSession(), { wrapper });
+    await waitFor(() => expect(result.current.status).toBe('unavailable'));
+
+    jest.mocked(auth.getSession).mockResolvedValueOnce(USER);
+    await act(async () => result.current.retry());
+
+    await waitFor(() => expect(result.current.status).toBe('signed-in'));
+  });
+
+  it('follows the stored account when its refresh later succeeds', async () => {
+    const { wrapper, emit } = setup(new Error('network'));
+    const { result } = await renderHook(() => useSession(), { wrapper });
+    await waitFor(() => expect(result.current.status).toBe('unavailable'));
+
+    await act(async () => emit(USER));
+    expect(result.current.status).toBe('signed-in');
   });
 
   it('follows sign-in and sign-out events', async () => {

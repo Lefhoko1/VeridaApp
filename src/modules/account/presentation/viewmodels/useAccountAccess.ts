@@ -1,5 +1,8 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 
+import { errorMessage } from '@/core/errors/AppError';
+import { useFeedback } from '@/design-system';
+
 import type { AccountStatus } from '../../domain/models';
 import { useAccountDependencies } from '../di';
 import { useSession } from './useSession';
@@ -22,7 +25,9 @@ export function useAccountAccess() {
     queryFn: () => profiles.getProfile(userId ?? ''),
     enabled: Boolean(userId),
   });
-  const signOut = useMutation({ mutationFn: () => auth.signOut() });
+  const feedback = useFeedback();
+  // A failed sign-out leaves the account on this device, so the user must be told rather than left guessing.
+  const signOut = useMutation({ mutationFn: () => auth.signOut(), onError: (error) => feedback.error(errorMessage(error)) });
 
   return {
     // If the profile cannot be read, the database still protects the data, so the user is not locked out.

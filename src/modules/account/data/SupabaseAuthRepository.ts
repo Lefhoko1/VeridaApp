@@ -2,6 +2,7 @@ import { AppError } from '@/core/errors/AppError';
 import { mapProviderError } from '@/core/supabase/mapError';
 import type { SupabaseClient } from '@/core/supabase/client';
 
+import { EmailNotVerifiedError } from '../domain/errors';
 import type { Session } from '../domain/models';
 import type { AuthRepository, Unsubscribe } from '../domain/repositories';
 
@@ -11,7 +12,7 @@ function assertOk(response: AuthResponse): void {
   if (!response.error) return;
   const { code, message = '' } = response.error;
   if (code === 'invalid_credentials') throw new AppError('unauthenticated', 'That email or password is not correct.');
-  if (code === 'email_not_confirmed') throw new AppError('unauthenticated', 'Verify your email address before signing in.');
+  if (code === 'email_not_confirmed') throw new EmailNotVerifiedError();
   if (code === 'user_already_exists' || code === 'email_exists') throw new AppError('conflict', 'An account with this email already exists.');
   if (code === 'weak_password') throw new AppError('validation', 'Choose a stronger password.');
   if (code === 'otp_expired') throw new AppError('validation', 'That code is incorrect or has expired.');

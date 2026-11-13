@@ -50,8 +50,16 @@ function AuthLayout({ title, subtitle, error, children }: { title: string; subti
   );
 }
 
-export function SignInScreen({ onSignUp, onForgotPassword }: { onSignUp: () => void; onForgotPassword: () => void }) {
-  const vm = useSignInViewModel();
+export function SignInScreen({
+  onSignUp,
+  onForgotPassword,
+  onUnverified,
+}: {
+  onSignUp: () => void;
+  onForgotPassword: () => void;
+  onUnverified: (email: string) => void;
+}) {
+  const vm = useSignInViewModel(onUnverified);
   const { values, errors, setValue } = vm.form;
   return (
     <AuthLayout title="Welcome back" subtitle={SIGN_IN_SUBTITLE[vm.area]} error={vm.error}>

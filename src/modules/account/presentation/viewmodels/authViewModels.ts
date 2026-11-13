@@ -5,24 +5,33 @@ import { useForm } from '@/core/forms/useForm';
 import { useFeedback } from '@/design-system';
 
 import { areaOf, choiceFor, type EntryArea, type EntryChoice } from '../../domain/entryChoice';
+import { EmailNotVerifiedError } from '../../domain/errors';
 import { forgotPasswordSchema, resetPasswordSchema, signInSchema, signUpSchema, verifyEmailSchema } from '../../domain/validation';
 import { useAccountDependencies } from '../di';
 import { useEntryChoice } from './useEntryChoice';
 
-export function useSignInViewModel() {
+export function useSignInViewModel(onUnverified: (email: string) => void) {
   const { auth } = useAccountDependencies();
   const { choice, setChoice } = useEntryChoice();
   const form = useForm(signInSchema, { email: '', password: '' });
   const mutation = useMutation({
     mutationFn: ({ email, password }: { email: string; password: string }) => auth.signIn(email, password),
+    onError: (error, { email }) => {
+      if (!(error instanceof EmailNotVerifiedError)) return;
+      // The first code may have expired or been lost, so send a fresh one. If that fails, for example
+      // on the resend rate limit, the code screen can still send another.
+      void auth.resendVerification(email).catch(() => undefined);
+      onUnverified(email);
+    },
   });
+  const failure = mutation.error instanceof EmailNotVerifiedError ? null : mutation.error;
 
   return {
     form,
     area: areaOf(choice),
     setArea: (area: EntryArea) => setChoice(choiceFor(area)),
     busy: mutation.isPending,
-    error: mutation.error ? errorMessage(mutation.error) : null,
+    error: failure ? errorMessage(failure) : null,
     // The session listener moves the user on after a successful sign-in.
     submit() {
       const input = form.validate();

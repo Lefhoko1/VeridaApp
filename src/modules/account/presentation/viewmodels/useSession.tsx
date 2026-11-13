@@ -1,13 +1,19 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import type { Session } from '../../domain/models';
 import { useAccountDependencies } from '../di';
 
-type SessionState =
+type SessionState = (
   | { status: 'loading'; session: null }
   | { status: 'signed-out'; session: null }
-  | { status: 'signed-in'; session: Session };
+  // A session is stored but could not be refreshed, usually because the network failed. Showing
+  // sign-in here would be wrong: the stored account comes back once a later refresh succeeds.
+  | { status: 'unavailable'; session: null }
+  | { status: 'signed-in'; session: Session }
+) & { retry: () => void };
+
+const UNAVAILABLE = 'unavailable';
 
 const SessionContext = createContext<SessionState | null>(null);
 
@@ -15,7 +21,8 @@ const SessionContext = createContext<SessionState | null>(null);
 export function SessionProvider({ children }: { children: ReactNode }) {
   const { auth } = useAccountDependencies();
   const queryClient = useQueryClient();
-  const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [session, setSession] = useState<Session | null | undefined | typeof UNAVAILABLE>(undefined);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -25,14 +32,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (!cancelled) setSession((existing) => (existing === undefined ? current : existing));
       })
       .catch(() => {
-        if (!cancelled) setSession(null);
+        if (!cancelled) setSession((existing) => (existing === undefined ? UNAVAILABLE : existing));
       });
     const unsubscribe = auth.onSessionChange(setSession);
     return () => {
       cancelled = true;
       unsubscribe();
     };
-  }, [auth]);
+  }, [auth, attempt]);
+
+  const retry = useCallback(() => {
+    setSession(undefined);
+    setAttempt((count) => count + 1);
+  }, []);
 
   // Cached data belongs to the signed-in user, and the next person on this device must not see it.
   useEffect(() => {
@@ -40,9 +52,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [session, queryClient]);
 
   const value = useMemo<SessionState>(() => {
-    if (session === undefined) return { status: 'loading', session: null };
-    return session ? { status: 'signed-in', session } : { status: 'signed-out', session: null };
-  }, [session]);
+    if (session === undefined) return { status: 'loading', session: null, retry };
+    if (session === UNAVAILABLE) return { status: 'unavailable', session: null, retry };
+    return session ? { status: 'signed-in', session, retry } : { status: 'signed-out', session: null, retry };
+  }, [session, retry]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

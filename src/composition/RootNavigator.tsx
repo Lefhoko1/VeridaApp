@@ -9,7 +9,7 @@ import { useBusinessContext } from '@/modules/business';
 // Which area of the app the current user may reach. These guards are for navigation only:
 // the actual access control is row-level security in the database.
 export function RootNavigator() {
-  const { status: sessionStatus } = useSession();
+  const { status: sessionStatus, retry: retrySession } = useSession();
   const { status: businessStatus, error, retry } = useBusinessContext();
   const { blockedMessage } = useAccountAccess();
   const platform = usePlatformAccess();
@@ -26,6 +26,13 @@ export function RootNavigator() {
           <BrandLogo size={44} inverse />
         </Breathe>
       </BrandSplash>
+    );
+  }
+  if (sessionStatus === 'unavailable') {
+    return (
+      <Screen>
+        <ErrorView message="We could not check your sign-in. Check your internet connection and try again." onRetry={retrySession} />
+      </Screen>
     );
   }
   if (isSignedIn && blockedMessage) return <AccountBlockedScreen message={blockedMessage} />;
