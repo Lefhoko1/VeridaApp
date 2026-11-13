@@ -3,7 +3,8 @@ import { View, type ColorValue } from 'react-native';
 import { IconButton } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { brandHeader, HeaderBackdrop, supporting, TabIcon, tabBarOptions, tabBarSurface } from '@/design-system';
+import { webHeader } from '@/composition/WebShells';
+import { brandHeader, HeaderBackdrop, supporting, TabIcon, tabBarOptions, tabBarSurface, useWideLayout } from '@/design-system';
 import { useActiveBusiness } from '@/modules/business';
 import { NotificationBell } from '@/modules/notifications';
 
@@ -29,18 +30,24 @@ function HeaderActions() {
 export default function TabsLayout() {
   const { business } = useActiveBusiness();
   const { bottom } = useSafeAreaInsets();
+  const wide = useWideLayout();
 
   return (
     <Tabs
-      screenOptions={{
-        ...brandHeader,
-        ...tabBarOptions,
-        headerTitle: business.name,
-        headerBackground: HeaderBackdrop,
-        headerRight: HeaderActions,
-        // The default height clips the labels, and an explicit height must include the safe area.
-        tabBarStyle: { ...tabBarSurface, height: TAB_BAR_HEIGHT + bottom },
-      }}
+      screenOptions={
+        wide
+          ? // On a wide window on the web, the sidebar replaces the tab bar and the header's buttons.
+            { ...tabBarOptions, header: webHeader(business.name), tabBarStyle: { display: 'none' } }
+          : {
+              ...brandHeader,
+              ...tabBarOptions,
+              headerTitle: business.name,
+              headerBackground: HeaderBackdrop,
+              headerRight: HeaderActions,
+              // The default height clips the labels, and an explicit height must include the safe area.
+              tabBarStyle: { ...tabBarSurface, height: TAB_BAR_HEIGHT + bottom },
+            }
+      }
     >
       <Tabs.Screen name="overview" options={{ title: 'Overview', tabBarIcon: tabIcon('view-dashboard-outline', 'view-dashboard') }} />
       <Tabs.Screen name="records" options={{ title: 'Records', tabBarIcon: tabIcon('notebook-edit-outline', 'notebook-edit') }} />

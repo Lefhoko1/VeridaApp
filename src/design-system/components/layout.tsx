@@ -6,6 +6,7 @@ import Animated from 'react-native-reanimated';
 import { palette, supporting } from '../theme/palette';
 import { contentMaxWidth, radius, shadows, spacing } from '../theme/theme';
 import { entrance } from './motion';
+import { HeroFillProvider, pageMaxWidth, useInShell, useWideLayout } from './responsive';
 
 type ScreenProps = {
   children: ReactNode;
@@ -17,8 +18,35 @@ type ScreenProps = {
   hero?: ReactNode;
 };
 
-export function Screen({ children, scroll = true, refreshing = false, onRefresh, footer, hero }: ScreenProps) {
-  const body = <View style={styles.content}>{children}</View>;
+export function Screen(props: ScreenProps) {
+  const wide = useWideLayout();
+  const inShell = useInShell();
+  if (!wide) return <MobileScreen {...props} />;
+  if (props.hero && !inShell) return <SplitScreen {...props} />;
+  // Inside the sidebar layout the sidebar carries the brand, so the decorative picture is dropped.
+  return <MobileScreen {...props} hero={undefined} wide />;
+}
+
+// The website on a wide window, for pages with a picture and no sidebar, such as sign-in: the
+// picture fills one side and the form sits on the other.
+function SplitScreen({ children, footer, hero }: ScreenProps) {
+  return (
+    <View style={[styles.screen, styles.split]}>
+      <View style={styles.splitPicture}>
+        <HeroFillProvider value>{hero}</HeroFillProvider>
+      </View>
+      <View style={styles.fill}>
+        <ScrollView contentContainerStyle={styles.splitScroll} keyboardShouldPersistTaps="handled">
+          <View style={[styles.content, styles.splitContent]}>{children}</View>
+        </ScrollView>
+        {footer}
+      </View>
+    </View>
+  );
+}
+
+function MobileScreen({ children, scroll = true, refreshing = false, onRefresh, footer, hero, wide = false }: ScreenProps & { wide?: boolean }) {
+  const body = <View style={[styles.content, wide && styles.wideContent]}>{children}</View>;
   return (
     <KeyboardAvoidingView
       style={styles.screen}
@@ -97,6 +125,11 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radius.xxl,
   },
   content: { width: '100%', maxWidth: contentMaxWidth, padding: spacing.lg, gap: spacing.lg, flexGrow: 1 },
+  wideContent: { maxWidth: pageMaxWidth, paddingHorizontal: spacing.xl, paddingTop: spacing.xl },
+  split: { flexDirection: 'row' },
+  splitPicture: { flex: 1, maxWidth: 640 },
+  splitScroll: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: spacing.xxl },
+  splitContent: { maxWidth: 480, flexGrow: 0 },
   fill: { flex: 1 },
   panel: {
     backgroundColor: supporting.white,

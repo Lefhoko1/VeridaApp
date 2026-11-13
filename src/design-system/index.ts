@@ -17,6 +17,8 @@ export {
 export { Kicker, Panel, Row, Screen, SectionHeader, Stack } from './components/layout';
 export { Breathe, GrowBar, PressableScale, Reveal, Skeleton, TypingDots, entrance, motion } from './components/motion';
 export { TabIcon, brandHeader, tabBarOptions, tabBarSurface } from './components/navigation';
+export { WIDE_MIN_WIDTH, pageMaxWidth, useInShell, useWideLayout } from './components/responsive';
+export { PageHeader, WebShell, type ShellNavItem, type ShellNavSection } from './components/webShell';
 export { PermissionChecklist, type PermissionRow } from './components/permissions';
 export { EmptyState, ErrorView, LoadingView, Notice, StatusPill, type StatusTone } from './components/status';
 export { FeedbackProvider, useFeedback } from './feedback/FeedbackProvider';

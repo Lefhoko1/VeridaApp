@@ -77,12 +77,24 @@ The app works without steps 2 to 4. Ask Verida and lessons use built-in rules an
 
 [supabase/dev/load_demo_data.sql](supabase/dev/load_demo_data.sql) gives an existing account the prototype's two demo businesses with 45 days of records. Development only.
 
+## Website
+
+The same code is both the phone app and the website, so a fix or feature reaches both at once. To publish the website:
+
+1. Set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in the build environment (or `.env.local`). They are built into the site and anyone can read them, so only use the publishable key.
+2. Run `npm run build:web`. The site is written to `dist/`.
+3. Upload `dist/` to any static host, such as Netlify, Vercel, Cloudflare Pages or EAS Hosting (`npx eas deploy`).
+4. Send every unknown path to `/index.html`, because the site is a single page app and addresses like `/sign-in` exist only in the browser. Without this, refreshing any page other than the home page shows the host's "not found" page.
+
+Use code that is different on the web only where a browser truly behaves differently, through `Platform.OS === 'web'` or a `.web.ts` file, as `core/storage/keyValueStore.ts` and `core/export/shareFile.ts` do.
+
 ## Commands
 
 | Command | What it does |
 | --- | --- |
 | `npm start` | Start the Expo dev server |
 | `npm run web` | Run in a browser |
+| `npm run build:web` | Build the website into `dist/`, ready to host |
 | `npm run dev:backend` | Start the local emulated Supabase |
 | `npm run typecheck` | Type check |
 | `npm run lint` | Lint, including the architecture rules |

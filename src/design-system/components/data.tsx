@@ -6,6 +6,7 @@ import { radius, shadows, spacing } from '../theme/theme';
 import { GrowBar, GrowColumn, motion, PressableScale, Reveal } from './motion';
 import { IconTile, type TileTone } from './art';
 import { Panel } from './layout';
+import { useWideLayout } from './responsive';
 import { StatusPill, type StatusTone } from './status';
 
 type MetricCardProps = {
@@ -19,8 +20,9 @@ type MetricCardProps = {
 };
 
 export function MetricCard({ label, value, caption, status, onPress, index = 0 }: MetricCardProps) {
+  const wide = useWideLayout();
   return (
-    <Reveal index={index} style={styles.metricSlot}>
+    <Reveal index={index} style={[styles.metricSlot, wide && styles.metricSlotWide]}>
       <PressableScale onPress={onPress} disabled={!onPress} style={styles.metric} accessibilityRole={onPress ? 'button' : undefined}>
         <Text style={styles.metricLabel}>{label}</Text>
         <Text style={styles.metricValue} numberOfLines={1} adjustsFontSizeToFit>
@@ -164,6 +166,8 @@ const styles = StyleSheet.create({
   detailRows: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   metricSlot: { flexGrow: 1, flexBasis: '45%', minWidth: 140 },
+  // Four to a row on a wide window, as in the prototype.
+  metricSlotWide: { flexBasis: '22%' },
   metric: {
     flexGrow: 1,
     backgroundColor: supporting.white,

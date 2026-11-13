@@ -1,6 +1,8 @@
 import { Stack } from 'expo-router';
 
-import { brandHeader, palette } from '@/design-system';
+import { WorkspaceWebShell, webHeader } from '@/composition/WebShells';
+import { brandHeader, palette, useWideLayout } from '@/design-system';
+import { useActiveBusiness } from '@/modules/business';
 
 const SCREEN_TITLES: Record<string, string> = {
   'sales/new': 'New sale',
@@ -39,10 +41,14 @@ const SCREEN_TITLES: Record<string, string> = {
 };
 
 export default function WorkspaceLayout() {
-  return (
+  const wide = useWideLayout();
+  const { business } = useActiveBusiness();
+
+  const stack = (
     <Stack
       screenOptions={{
         ...brandHeader,
+        ...(wide ? { header: webHeader(business.name) } : null),
         contentStyle: { backgroundColor: palette.warmIvory },
       }}
     >
@@ -52,4 +58,7 @@ export default function WorkspaceLayout() {
       ))}
     </Stack>
   );
+
+  // On a wide window on the web, the pages sit beside a sidebar instead of under tabs.
+  return wide ? <WorkspaceWebShell>{stack}</WorkspaceWebShell> : stack;
 }

@@ -9,3 +9,4 @@ export function createNotificationsDependencies(client: SupabaseClient): Notific
 
 export { NotificationsDependenciesProvider } from './presentation/di';
 export { NotificationBell, NotificationsScreen } from './presentation/views/notificationScreens';
+export { useUnreadCount } from './presentation/viewmodels/useNotificationsViewModel';

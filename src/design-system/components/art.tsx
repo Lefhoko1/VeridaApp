@@ -11,6 +11,7 @@ import { gradients, radius, shadows, spacing } from '../theme/theme';
 import { BrandLogo } from './brand';
 import { Kicker } from './layout';
 import { entrance, motion } from './motion';
+import { useHeroFill } from './responsive';
 
 // Original artwork in the Verida palette. Sources are in assets/source. All of it is decorative
 // unless a label is passed, so screen readers skip it by default.
@@ -85,9 +86,10 @@ export function SceneHeader({ scene = 'savanna', tagline, children }: { scene?: 
   const { height } = useWindowDimensions();
   const { top } = useSafeAreaInsets();
   const drift = usePictureDrift();
+  const fill = useHeroFill();
   const pictureHeight = Math.min(HERO_HEIGHT.max, Math.max(HERO_HEIGHT.min, height * HERO_HEIGHT.ratio));
   return (
-    <View style={[styles.scene, { height: pictureHeight + top }]}>
+    <View style={[styles.scene, fill ? styles.sceneFill : { height: pictureHeight + top }]}>
       <Animated.View style={[StyleSheet.absoluteFill, drift]}>
         <Image source={SCENES[scene]} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="center" transition={motion.base} />
       </Animated.View>
@@ -146,6 +148,7 @@ const styles = StyleSheet.create({
   heroBody: { color: palette.softMint },
   heroAction: { marginTop: spacing.sm, alignItems: 'flex-start' },
   scene: { width: '100%', overflow: 'hidden', backgroundColor: palette.deepTeal },
+  sceneFill: { flex: 1 },
   sceneContent: { paddingHorizontal: spacing.xl, gap: spacing.xs },
   tagline: { fontSize: 11, fontWeight: '600', letterSpacing: 1.2, color: palette.softMint },
   splash: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.lg },
