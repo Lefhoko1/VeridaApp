@@ -1,7 +1,7 @@
 import { StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 
-import { EmptyState, ErrorView, GroupedBarChart, Kicker, LoadingView, Notice, Panel, Screen, SectionHeader, supporting, HeroCard, IconTile, Row, spacing, type TileTone } from '@/design-system';
+import { CardGrid, EmptyState, ErrorView, GroupedBarChart, Kicker, LoadingView, Notice, Panel, Screen, SectionHeader, supporting, HeroCard, IconTile, Row, spacing, type TileTone } from '@/design-system';
 
 import type { InsightKind } from '../../domain/models';
 import { PeriodSelector } from '../components/PeriodSelector';
@@ -36,7 +36,8 @@ export function InsightsScreen() {
       ) : vm.error ? (
         <ErrorView message={vm.error} onRetry={vm.refresh} />
       ) : (
-        vm.insights.map((insight) => (
+        <CardGrid>
+          {vm.insights.map((insight) => (
           <Panel key={insight.id}>
             <Row gap={spacing.sm}>
               <IconTile icon={KIND[insight.kind].icon} tone={KIND[insight.kind].tone} size={32} />
@@ -48,7 +49,8 @@ export function InsightsScreen() {
             </Text>
             <Text style={styles.evidence}>Based on: {insight.evidence}</Text>
           </Panel>
-        ))
+          ))}
+        </CardGrid>
       )}
 
       <Notice tone="info">Insights are generated from the records entered in Verida. They are not financial advice and do not infer missing information.</Notice>

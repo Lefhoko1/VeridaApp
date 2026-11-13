@@ -56,6 +56,7 @@ function NavButton({ item }: { item: ShellNavItem }) {
       accessibilityLabel={item.badge ? `${item.label}, ${item.badge} unread` : item.label}
       style={(state) => [styles.navButton, (item.active || (state as { hovered?: boolean }).hovered) && styles.navButtonActive]}
     >
+      {item.active ? <View style={styles.activeBar} /> : null}
       <Icon source={item.icon} size={19} color={item.active ? supporting.white : palette.softMint} />
       <Text style={[styles.navLabel, item.active && styles.navLabelActive]} numberOfLines={1}>
         {item.label}
@@ -99,6 +100,7 @@ const styles = StyleSheet.create({
   sectionTitle: { color: '#B8D0C7', fontSize: 10, fontWeight: '700', letterSpacing: 1.2, paddingHorizontal: 12, marginBottom: 2 },
   navButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: 11, paddingHorizontal: 12, borderRadius: 9 },
   navButtonActive: { backgroundColor: 'rgba(255,255,255,0.1)' },
+  activeBar: { position: 'absolute', left: 0, top: 10, bottom: 10, width: 3, borderRadius: 2, backgroundColor: palette.mutedCoral },
   navLabel: { flex: 1, color: palette.softMint, fontSize: 14 },
   navLabelActive: { color: supporting.white, fontWeight: '600' },
   badge: { minWidth: 20, paddingHorizontal: 6, height: 20, borderRadius: 10, backgroundColor: palette.mutedCoral, alignItems: 'center', justifyContent: 'center' },

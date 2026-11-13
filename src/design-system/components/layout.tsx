@@ -16,6 +16,8 @@ type ScreenProps = {
   footer?: ReactNode;
   // A full-width picture above the content, which then sits on it as a rounded sheet.
   hero?: ReactNode;
+  // On the website, a form is kept to a comfortable reading width rather than the whole page.
+  variant?: 'page' | 'form';
 };
 
 export function Screen(props: ScreenProps) {
@@ -45,8 +47,8 @@ function SplitScreen({ children, footer, hero }: ScreenProps) {
   );
 }
 
-function MobileScreen({ children, scroll = true, refreshing = false, onRefresh, footer, hero, wide = false }: ScreenProps & { wide?: boolean }) {
-  const body = <View style={[styles.content, wide && styles.wideContent]}>{children}</View>;
+function MobileScreen({ children, scroll = true, refreshing = false, onRefresh, footer, hero, variant, wide = false }: ScreenProps & { wide?: boolean }) {
+  const body = <View style={[styles.content, wide && styles.wideContent, wide && variant === 'form' && styles.formContent]}>{children}</View>;
   return (
     <KeyboardAvoidingView
       style={styles.screen}
@@ -125,7 +127,8 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radius.xxl,
   },
   content: { width: '100%', maxWidth: contentMaxWidth, padding: spacing.lg, gap: spacing.lg, flexGrow: 1 },
-  wideContent: { maxWidth: pageMaxWidth, paddingHorizontal: spacing.xl, paddingTop: spacing.xl },
+  wideContent: { maxWidth: pageMaxWidth, paddingHorizontal: spacing.xl, paddingTop: spacing.lg },
+  formContent: { maxWidth: 820, alignSelf: 'flex-start' },
   split: { flexDirection: 'row' },
   splitPicture: { flex: 1, maxWidth: 640 },
   splitScroll: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: spacing.xxl },

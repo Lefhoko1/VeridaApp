@@ -213,7 +213,7 @@ export function KpiFormScreen({ onDone }: { onDone: () => void }) {
   const { values, errors, setValue } = vm.form;
 
   return (
-    <Screen>
+    <Screen variant="form">
       <Panel>
         <SectionHeader title="New KPI" description="Built from an activity's records. Other calculations need a new formula in the analytics service." />
         <FormField label="Code" value={values.code} onChangeText={(v) => setValue('code', v)} error={errors.code} autoCapitalize="none" />

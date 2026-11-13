@@ -4,8 +4,9 @@ import { Icon, IconButton, Searchbar, Text, TextInput, TouchableRipple } from 'r
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { palette, supporting } from '../theme/palette';
-import { radius, spacing } from '../theme/theme';
+import { radius, shadows, spacing } from '../theme/theme';
 import { Button } from './button';
+import { useWideLayout } from './responsive';
 import { matchesSearch, toggleAll, toggleOption, type SelectOption } from './optionSelection';
 
 const SEARCH_FROM = 9;
@@ -48,6 +49,8 @@ function SheetBody({ title, options, selected, multiple, allowOther, allLabel, o
   const { height } = useWindowDimensions();
   const { top, bottom } = useSafeAreaInsets();
   const [other, setOther] = useState(savedOther);
+  // On the website the picker is a dialog in the middle of the window, not a sheet from the bottom.
+  const wide = useWideLayout();
 
   const visibleOptions = useMemo(() => options.filter((option) => matchesSearch(option, search)), [options, search]);
   const needsConfirm = Boolean(multiple) || otherOn;
@@ -67,9 +70,9 @@ function SheetBody({ title, options, selected, multiple, allowOther, allLabel, o
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.avoider}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.avoider, wide && styles.avoiderWide]}>
       <Pressable style={styles.backdrop} onPress={onDismiss} accessibilityRole="button" accessibilityLabel="Close the list" />
-      <View style={[styles.sheet, { maxHeight: Math.min(height * SHEET_SHARE_OF_SCREEN, height - top), paddingBottom: spacing.lg + bottom }]}>
+      <View style={wide ? [styles.sheet, styles.dialog, { maxHeight: height * 0.7 }] : [styles.sheet, { maxHeight: Math.min(height * SHEET_SHARE_OF_SCREEN, height - top), paddingBottom: spacing.lg + bottom }]}>
         <View style={styles.header}>
           <Text variant="titleMedium" style={styles.title} accessibilityRole="header">
             {title}
@@ -168,4 +171,6 @@ const styles = StyleSheet.create({
   other: { marginHorizontal: spacing.xl, marginBottom: spacing.sm, backgroundColor: supporting.white },
   otherOutline: { borderRadius: radius.md },
   footer: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  avoiderWide: { justifyContent: 'center' },
+  dialog: { maxWidth: 440, borderRadius: radius.xl, paddingBottom: spacing.lg, ...shadows.soft },
 });

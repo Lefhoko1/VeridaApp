@@ -82,7 +82,7 @@ export function ContentFormScreen({ contentId, onDone }: { contentId?: string; o
   const { values, errors, setValue } = vm.form;
 
   return (
-    <Screen>
+    <Screen variant="form">
       <Panel>
         <SectionHeader title="Categories" description={vm.version ? `Version ${vm.version}. Editing the lesson text creates a new version.` : undefined} />
         <SelectField label="Industry" value={values.industryCode} options={vm.industryOptions} onChange={(v) => setValue('industryCode', v)} />

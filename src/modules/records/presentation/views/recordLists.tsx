@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { Divider, List, Searchbar, Text } from 'react-native-paper';
 
 import { formatDate, formatQuantity } from '@/core/format/format';
-import { MultiSelectField, Button, EmptyState, ErrorView, LoadingView, Panel, Row, Screen, SelectField, StatusPill, palette, spacing, supporting, IconTile } from '@/design-system';
+import { MultiSelectField, Button, DataTable, EmptyState, ErrorView, LoadingView, Panel, Row, Screen, SelectField, StatusPill, palette, spacing, supporting, IconTile, useWideLayout } from '@/design-system';
 
 import { DATE_RANGE_OPTIONS } from '@/core/time/dateRange';
 
@@ -30,6 +30,21 @@ type ListShellProps = {
 };
 
 function ListShell({ searchPlaceholder, search, onSearch, actions, loading, error, onRetry, refreshing, onRefresh, isEmpty, empty, children, header, filters }: ListShellProps) {
+  const wide = useWideLayout();
+  if (wide) {
+    // The website: search, filters and actions on one toolbar, then a table that brings its own frame.
+    return (
+      <Screen>
+        {header ? <View style={styles.segment}>{header}</View> : null}
+        <View style={styles.toolbar}>
+          <Searchbar placeholder={searchPlaceholder} value={search} onChangeText={onSearch} style={[styles.search, styles.toolbarSearch]} inputStyle={styles.searchInput} />
+          {filters ? <View style={styles.toolbarFilters}>{filters}</View> : null}
+          <Row gap={spacing.sm}>{actions}</Row>
+        </View>
+        {loading ? <LoadingView /> : error ? <ErrorView message={error} onRetry={onRetry} /> : isEmpty ? empty : children}
+      </Screen>
+    );
+  }
   return (
     <Screen refreshing={refreshing} onRefresh={onRefresh}>
       {header}
@@ -62,6 +77,7 @@ type SalesListProps = { header?: ReactNode; onCreate: () => void; onImport: () =
 
 export function SalesList({ header, onCreate, onImport, onOpen }: SalesListProps) {
   const vm = useSalesListViewModel();
+  const wide = useWideLayout();
   return (
     <ListShell
       header={header}
@@ -94,7 +110,23 @@ export function SalesList({ header, onCreate, onImport, onOpen }: SalesListProps
         </>
       }
     >
-      {vm.items.map((sale, index) => (
+      {wide ? (
+        <DataTable
+          rows={vm.items}
+          rowKey={(sale) => sale.id}
+          onRowPress={(sale) => onOpen(sale.id)}
+          rowLabel={(sale) => `${sale.itemName}, ${vm.money(sale.totalAmount)}`}
+          isMuted={(sale) => sale.status === 'voided'}
+          columns={[
+            { key: 'date', title: 'Date', render: (sale) => formatDate(sale.occurredOn), flex: 1 },
+            { key: 'item', title: 'Item or service', render: (sale) => sale.itemName, flex: 2 },
+            { key: 'category', title: 'Category', render: (sale) => sale.category, flex: 1.4 },
+            { key: 'qty', title: 'Quantity', render: (sale) => `${formatQuantity(sale.quantity)}${sale.unit ? ` ${sale.unit}` : ''}`, align: 'right' },
+            { key: 'price', title: 'Unit price', render: (sale) => vm.money(sale.unitPrice), align: 'right' },
+            { key: 'total', title: 'Total', render: (sale) => (sale.status === 'voided' ? voidedPill : <Text style={styles.amount}>{vm.money(sale.totalAmount)}</Text>), align: 'right', flex: 1.2 },
+          ]}
+        />
+      ) : vm.items.map((sale, index) => (
         <View key={sale.id}>
           {index > 0 ? <Divider /> : null}
           <RecordRow
@@ -114,6 +146,7 @@ type ExpenseListProps = { header?: ReactNode; onCreate: () => void; onImport: ()
 
 export function ExpenseList({ header, onCreate, onImport, onOpen }: ExpenseListProps) {
   const vm = useExpenseListViewModel();
+  const wide = useWideLayout();
   return (
     <ListShell
       header={header}
@@ -146,7 +179,27 @@ export function ExpenseList({ header, onCreate, onImport, onOpen }: ExpenseListP
         </>
       }
     >
-      {vm.items.map((expense, index) => (
+      {wide ? (
+        <DataTable
+          rows={vm.items}
+          rowKey={(expense) => expense.id}
+          onRowPress={(expense) => onOpen(expense.id)}
+          rowLabel={(expense) => `${expense.description}, ${vm.money(expense.amount)}`}
+          isMuted={(expense) => expense.status === 'voided'}
+          columns={[
+            { key: 'date', title: 'Date', render: (expense) => formatDate(expense.occurredOn), flex: 1 },
+            { key: 'description', title: 'Description', render: (expense) => expense.description, flex: 2.2 },
+            { key: 'category', title: 'Category', render: (expense) => expense.category, flex: 1.4 },
+            {
+              key: 'certainty',
+              title: 'Figure',
+              render: (expense) =>
+                expense.status === 'voided' ? voidedPill : expense.certainty === 'recorded' ? 'Recorded' : <StatusPill label={expense.certainty === 'estimated' ? 'Estimated' : 'Incomplete'} tone="warn" />,
+            },
+            { key: 'amount', title: 'Amount', render: (expense) => <Text style={[styles.amount, expense.status === 'voided' && styles.voided]}>{vm.money(expense.amount)}</Text>, align: 'right', flex: 1.2 },
+          ]}
+        />
+      ) : vm.items.map((expense, index) => (
         <View key={expense.id}>
           {index > 0 ? <Divider /> : null}
           <RecordRow
@@ -182,6 +235,7 @@ function RecordRow({ title, subtitle, amount, voided, pill, onPress }: { title: 
 
 export function ProductListScreen({ onCreate, onOpen }: { onCreate: () => void; onOpen: (id: string) => void }) {
   const vm = useProductListViewModel();
+  const wide = useWideLayout();
   return (
     <ListShell
       searchPlaceholder="Search products and services"
@@ -200,7 +254,31 @@ export function ProductListScreen({ onCreate, onOpen }: { onCreate: () => void; 
         ) : null
       }
     >
-      {vm.items.map((product, index) => (
+      {wide ? (
+        <DataTable
+          rows={vm.items}
+          rowKey={(product) => product.id}
+          onRowPress={(product) => onOpen(product.id)}
+          rowLabel={(product) => product.name}
+          columns={[
+            {
+              key: 'name',
+              title: 'Name',
+              flex: 2.4,
+              render: (product) => (
+                <Row gap={spacing.sm}>
+                  <IconTile icon={product.kind === 'service' ? 'room-service-outline' : 'tag-outline'} size={32} />
+                  <Text style={styles.cellStrong}>{product.name}</Text>
+                </Row>
+              ),
+            },
+            { key: 'kind', title: 'Type', render: (product) => (product.kind === 'service' ? 'Service' : 'Product') },
+            { key: 'unit', title: 'Unit', render: (product) => product.unit },
+            { key: 'status', title: 'Status', render: (product) => <StatusPill label={product.isActive ? 'Active' : 'Inactive'} tone={product.isActive ? 'ok' : 'neutral'} /> },
+            { key: 'price', title: 'Selling price', render: (product) => <Text style={styles.amount}>{vm.money(product.sellingPrice)}</Text>, align: 'right', flex: 1.2 },
+          ]}
+        />
+      ) : vm.items.map((product, index) => (
         <View key={product.id}>
           {index > 0 ? <Divider /> : null}
           <List.Item
@@ -224,4 +302,9 @@ const styles = StyleSheet.create({
   rowEnd: { alignItems: 'flex-end', justifyContent: 'center', gap: spacing.xs },
   amount: { fontWeight: '700', color: palette.deepTeal },
   voided: { textDecorationLine: 'line-through', color: supporting.mutedText },
+  segment: { maxWidth: 440 },
+  toolbar: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexWrap: 'wrap' },
+  toolbarSearch: { flexGrow: 1, flexBasis: 260, height: 46 },
+  toolbarFilters: { flexGrow: 1, flexBasis: 360 },
+  cellStrong: { fontSize: 14, fontWeight: '600', color: palette.deepTeal },
 });

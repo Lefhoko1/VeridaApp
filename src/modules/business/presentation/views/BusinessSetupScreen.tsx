@@ -72,7 +72,7 @@ function BusinessSetupForm({ existing, onDone }: { existing?: Workspace; onDone?
   if (vm.loadingIndustries) return <LoadingView />;
 
   return (
-    <Screen hero={!vm.isEditing && !onDone ? <SceneHeader /> : undefined}>
+    <Screen variant="form" hero={!vm.isEditing && !onDone ? <SceneHeader /> : undefined}>
       {!vm.isEditing ? <PendingInvitations /> : null}
       <View style={styles.intro}>
         <Kicker>A better understanding starts here</Kicker>

@@ -4,7 +4,7 @@ import { Divider, List, Searchbar, Text } from 'react-native-paper';
 
 import { formatDate, formatQuantity } from '@/core/format/format';
 import { DATE_RANGE_OPTIONS } from '@/core/time/dateRange';
-import { Button, CsvImportScreen, DateField, EmptyState, ErrorView, FormField, LoadingView, Notice, Panel, Row, Screen, SelectField, StatusPill, palette, spacing, supporting } from '@/design-system';
+import { Button, CsvImportScreen, DataTable, DateField, EmptyState, ErrorView, FieldGrid, FormField, LoadingView, Notice, Panel, Row, Screen, SelectField, StatusPill, palette, spacing, supporting, useWideLayout } from '@/design-system';
 
 import { useActivityImportViewModel } from '../viewmodels/useActivityImportViewModel';
 import { useActivityFormViewModel, useActivityListViewModel, type ActivityPrefill } from '../viewmodels/useActivityViewModels';
@@ -38,9 +38,10 @@ type ActivityListProps = {
 
 export function ActivityList({ header, onCreate, onImport, onOpen, onOpenFlocks }: ActivityListProps) {
   const vm = useActivityListViewModel();
+  const wide = useWideLayout();
   return (
     <Screen refreshing={vm.refreshing} onRefresh={vm.refresh}>
-      {header}
+      {wide && header ? <View style={styles.segment}>{header}</View> : header}
       <Row wrap>
         {vm.canCreate ? (
           <Button mode="contained" icon="plus" onPress={onCreate}>
@@ -73,6 +74,27 @@ export function ActivityList({ header, onCreate, onImport, onOpen, onOpenFlocks 
         <ErrorView message={vm.error} onRetry={vm.refresh} />
       ) : vm.items.length === 0 ? (
         <EmptyState illustration="ledger" title="No activity recorded yet." description="One day is a snapshot. A series of records reveals a pattern." />
+      ) : wide ? (
+        <DataTable
+          rows={vm.items}
+          rowKey={(record) => record.id}
+          onRowPress={(record) => onOpen(record.id)}
+          rowLabel={(record) => record.activityName}
+          isMuted={(record) => record.status === 'voided'}
+          columns={[
+            { key: 'date', title: 'Date', render: (record) => formatDate(record.occurredOn) },
+            { key: 'activity', title: 'Activity', render: (record) => record.activityName, flex: 2 },
+            ...(vm.usesFlocks ? [{ key: 'flock', title: 'Flock', render: (record: (typeof vm.items)[number]) => vm.flockNameOf(record.flockId) ?? '—' }] : []),
+            { key: 'notes', title: 'Notes', render: (record) => record.notes ?? '', flex: 2 },
+            {
+              key: 'quantity',
+              title: 'Quantity',
+              align: 'right',
+              flex: 1.2,
+              render: (record) => (record.status === 'voided' ? <StatusPill label="Voided" tone="danger" /> : <Text style={styles.quantity}>{`${formatQuantity(record.quantity)} ${record.unit}`}</Text>),
+            },
+          ]}
+        />
       ) : (
         <Panel style={styles.list}>
           {vm.items.map((record, index) => {
@@ -111,16 +133,18 @@ export function ActivityFormScreen({ activityId, prefill, onDone }: { activityId
   const { values, errors, setValue } = vm.form;
 
   return (
-    <Screen>
+    <Screen variant="form">
       {vm.isVoided ? <Notice title="This record has been voided">{`It no longer counts in your reports. Reason: ${vm.voidedReason ?? 'not given'}.`}</Notice> : null}
       <Panel>
         <SelectField label="What are you recording?" value={values.activityTypeId} options={vm.typeOptions} onChange={vm.selectType} error={errors.activityTypeId} hint={vm.typeDescription} disabled={vm.isVoided} />
-        <DateField label="Date" value={values.occurredOn} onChangeText={(v) => setValue('occurredOn', v)} error={errors.occurredOn} disabled={vm.isVoided} />
-        {vm.showFlock ? <SelectField label="Flock" value={values.flockId} options={vm.flockOptions} onChange={(v) => setValue('flockId', v)} disabled={vm.isVoided} /> : null}
-        <Row>
-          <FormField style={styles.grow} label="Quantity" value={values.quantity} onChangeText={(v) => setValue('quantity', v)} error={errors.quantity} keyboardType="numbers-and-punctuation" disabled={vm.isVoided} />
-          <FormField style={styles.grow} label="Unit" value={values.unit} onChangeText={(v) => setValue('unit', v)} error={errors.unit} disabled={vm.isVoided} />
-        </Row>
+        <FieldGrid>
+          <DateField label="Date" value={values.occurredOn} onChangeText={(v) => setValue('occurredOn', v)} error={errors.occurredOn} disabled={vm.isVoided} />
+          {vm.showFlock ? <SelectField label="Flock" value={values.flockId} options={vm.flockOptions} onChange={(v) => setValue('flockId', v)} disabled={vm.isVoided} /> : null}
+          <Row>
+            <FormField style={styles.grow} label="Quantity" value={values.quantity} onChangeText={(v) => setValue('quantity', v)} error={errors.quantity} keyboardType="numbers-and-punctuation" disabled={vm.isVoided} />
+            <FormField style={styles.grow} label="Unit" value={values.unit} onChangeText={(v) => setValue('unit', v)} error={errors.unit} disabled={vm.isVoided} />
+          </Row>
+        </FieldGrid>
         <FormField label="Notes (optional)" value={values.notes} onChangeText={(v) => setValue('notes', v)} error={errors.notes} multiline disabled={vm.isVoided} />
       </Panel>
       {vm.canSave ? (
@@ -172,12 +196,14 @@ export function FlockFormScreen({ flockId, onDone }: { flockId?: string; onDone:
   const readOnly = !vm.canEdit;
 
   return (
-    <Screen>
+    <Screen variant="form">
       <Panel>
-        <FormField label="Flock name" value={values.name} onChangeText={(v) => setValue('name', v)} error={errors.name} disabled={readOnly} />
-        <FormField label="Breed (optional)" value={values.breed} onChangeText={(v) => setValue('breed', v)} error={errors.breed} disabled={readOnly} />
-        <DateField label="Date acquired (optional)" value={values.acquiredOn} onChangeText={(v) => setValue('acquiredOn', v)} error={errors.acquiredOn} disabled={readOnly} />
-        <FormField label="Starting count (optional)" value={values.initialCount} onChangeText={(v) => setValue('initialCount', v)} error={errors.initialCount} keyboardType="number-pad" disabled={readOnly} />
+        <FieldGrid>
+          <FormField label="Flock name" value={values.name} onChangeText={(v) => setValue('name', v)} error={errors.name} disabled={readOnly} />
+          <FormField label="Breed (optional)" value={values.breed} onChangeText={(v) => setValue('breed', v)} error={errors.breed} disabled={readOnly} />
+          <DateField label="Date acquired (optional)" value={values.acquiredOn} onChangeText={(v) => setValue('acquiredOn', v)} error={errors.acquiredOn} disabled={readOnly} />
+          <FormField label="Starting count (optional)" value={values.initialCount} onChangeText={(v) => setValue('initialCount', v)} error={errors.initialCount} keyboardType="number-pad" disabled={readOnly} />
+        </FieldGrid>
       </Panel>
       {vm.canEdit ? (
         <Button mode="contained" onPress={vm.submit} loading={vm.busy} disabled={vm.busy}>
@@ -195,4 +221,5 @@ const styles = StyleSheet.create({
   quantity: { fontWeight: '700', color: palette.deepTeal },
   voided: { textDecorationLine: 'line-through', color: supporting.mutedText },
   grow: { flex: 1, minWidth: 0 },
+  segment: { maxWidth: 440 },
 });

@@ -1,7 +1,7 @@
 import { StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 
-import { Button, DateField, ErrorView, FormField, LoadingView, Notice, Panel, Row, Screen, SelectField, palette } from '@/design-system';
+import { Button, DateField, ErrorView, FieldGrid, FormField, LoadingView, Notice, Panel, Row, Screen, SelectField, palette } from '@/design-system';
 
 import { CERTAINTY_OPTIONS, PRODUCT_KIND_OPTIONS } from '../../domain/validation';
 import { useExpenseFormViewModel, type ExpensePrefill } from '../viewmodels/useExpenseViewModels';
@@ -19,18 +19,20 @@ export function SaleFormScreen({ saleId, prefill, onDone }: { saleId?: string; p
   const { values, errors, setValue } = vm.form;
 
   return (
-    <Screen>
+    <Screen variant="form">
       {vm.isVoided ? <VoidedNotice reason={vm.voidedReason} /> : null}
       <Panel>
         {vm.productOptions.length > 1 ? <SelectField label="From my catalogue (optional)" value={values.productId} options={vm.productOptions} onChange={vm.selectProduct} disabled={vm.isVoided} /> : null}
-        <FormField label="Item or service" value={values.itemName} onChangeText={(v) => setValue('itemName', v)} error={errors.itemName} disabled={vm.isVoided} />
-        <DateField label="Date" value={values.occurredOn} onChangeText={(v) => setValue('occurredOn', v)} error={errors.occurredOn} disabled={vm.isVoided} />
-        <SelectField label="Category" value={values.category} options={vm.categoryOptions} onChange={(v) => setValue('category', v)} error={errors.category} disabled={vm.isVoided} allowOther />
-        <Row>
-          <FormField style={styles.grow} label="Quantity" value={values.quantity} onChangeText={(v) => setValue('quantity', v)} error={errors.quantity} keyboardType="decimal-pad" disabled={vm.isVoided} />
-          <FormField style={styles.grow} label="Unit (optional)" value={values.unit} onChangeText={(v) => setValue('unit', v)} error={errors.unit} placeholder="e.g. trays" disabled={vm.isVoided} />
-        </Row>
-        <FormField label="Unit price" value={values.unitPrice} onChangeText={(v) => setValue('unitPrice', v)} error={errors.unitPrice} keyboardType="decimal-pad" disabled={vm.isVoided} />
+        <FieldGrid>
+          <FormField label="Item or service" value={values.itemName} onChangeText={(v) => setValue('itemName', v)} error={errors.itemName} disabled={vm.isVoided} />
+          <DateField label="Date" value={values.occurredOn} onChangeText={(v) => setValue('occurredOn', v)} error={errors.occurredOn} disabled={vm.isVoided} />
+          <SelectField label="Category" value={values.category} options={vm.categoryOptions} onChange={(v) => setValue('category', v)} error={errors.category} disabled={vm.isVoided} allowOther />
+          <Row>
+            <FormField style={styles.grow} label="Quantity" value={values.quantity} onChangeText={(v) => setValue('quantity', v)} error={errors.quantity} keyboardType="decimal-pad" disabled={vm.isVoided} />
+            <FormField style={styles.grow} label="Unit (optional)" value={values.unit} onChangeText={(v) => setValue('unit', v)} error={errors.unit} placeholder="e.g. trays" disabled={vm.isVoided} />
+          </Row>
+          <FormField label="Unit price" value={values.unitPrice} onChangeText={(v) => setValue('unitPrice', v)} error={errors.unitPrice} keyboardType="decimal-pad" disabled={vm.isVoided} />
+        </FieldGrid>
         <Text style={styles.total} accessibilityLiveRegion="polite">
           Total: {vm.totalPreview}
         </Text>
@@ -52,18 +54,20 @@ export function ExpenseFormScreen({ expenseId, prefill, onDone }: { expenseId?: 
   const { values, errors, setValue } = vm.form;
 
   return (
-    <Screen>
+    <Screen variant="form">
       {vm.isVoided ? <VoidedNotice reason={vm.voidedReason} /> : null}
       <Panel>
-        <DateField label="Date" value={values.occurredOn} onChangeText={(v) => setValue('occurredOn', v)} error={errors.occurredOn} disabled={vm.isVoided} />
-        <SelectField label="Category" value={values.category} options={vm.categoryOptions} onChange={(v) => setValue('category', v)} error={errors.category} disabled={vm.isVoided} allowOther />
-        <FormField label="Description" value={values.description} onChangeText={(v) => setValue('description', v)} error={errors.description} disabled={vm.isVoided} />
-        <FormField label="Amount" value={values.amount} onChangeText={(v) => setValue('amount', v)} error={errors.amount} keyboardType="decimal-pad" disabled={vm.isVoided} />
-        <SelectField label="How sure is this figure?" value={values.certainty} options={CERTAINTY_OPTIONS} onChange={(v) => setValue('certainty', v)} error={errors.certainty} disabled={vm.isVoided} />
-        <Row>
-          <FormField style={styles.grow} label="Quantity (optional)" value={values.quantity} onChangeText={(v) => setValue('quantity', v)} error={errors.quantity} keyboardType="decimal-pad" disabled={vm.isVoided} />
-          <FormField style={styles.grow} label="Unit (optional)" value={values.unit} onChangeText={(v) => setValue('unit', v)} error={errors.unit} placeholder="e.g. kg" disabled={vm.isVoided} />
-        </Row>
+        <FieldGrid>
+          <DateField label="Date" value={values.occurredOn} onChangeText={(v) => setValue('occurredOn', v)} error={errors.occurredOn} disabled={vm.isVoided} />
+          <SelectField label="Category" value={values.category} options={vm.categoryOptions} onChange={(v) => setValue('category', v)} error={errors.category} disabled={vm.isVoided} allowOther />
+          <FormField label="Description" value={values.description} onChangeText={(v) => setValue('description', v)} error={errors.description} disabled={vm.isVoided} />
+          <FormField label="Amount" value={values.amount} onChangeText={(v) => setValue('amount', v)} error={errors.amount} keyboardType="decimal-pad" disabled={vm.isVoided} />
+          <SelectField label="How sure is this figure?" value={values.certainty} options={CERTAINTY_OPTIONS} onChange={(v) => setValue('certainty', v)} error={errors.certainty} disabled={vm.isVoided} />
+          <Row>
+            <FormField style={styles.grow} label="Quantity (optional)" value={values.quantity} onChangeText={(v) => setValue('quantity', v)} error={errors.quantity} keyboardType="decimal-pad" disabled={vm.isVoided} />
+            <FormField style={styles.grow} label="Unit (optional)" value={values.unit} onChangeText={(v) => setValue('unit', v)} error={errors.unit} placeholder="e.g. kg" disabled={vm.isVoided} />
+          </Row>
+        </FieldGrid>
         <FormField label="Notes (optional)" value={values.notes} onChangeText={(v) => setValue('notes', v)} error={errors.notes} multiline disabled={vm.isVoided} />
       </Panel>
       {vm.canSave ? (
@@ -83,11 +87,13 @@ export function ProductFormScreen({ productId, onDone }: { productId?: string; o
   const readOnly = !vm.canManage;
 
   return (
-    <Screen>
+    <Screen variant="form">
       <Panel>
-        <SelectField label="Type" value={values.kind} options={PRODUCT_KIND_OPTIONS} onChange={(v) => setValue('kind', v)} error={errors.kind} disabled={readOnly} />
-        <FormField label="Name" value={values.name} onChangeText={(v) => setValue('name', v)} error={errors.name} disabled={readOnly} />
-        <FormField label="Category (optional)" value={values.category} onChangeText={(v) => setValue('category', v)} error={errors.category} disabled={readOnly} />
+        <FieldGrid>
+          <SelectField label="Type" value={values.kind} options={PRODUCT_KIND_OPTIONS} onChange={(v) => setValue('kind', v)} error={errors.kind} disabled={readOnly} />
+          <FormField label="Name" value={values.name} onChangeText={(v) => setValue('name', v)} error={errors.name} disabled={readOnly} />
+          <FormField label="Category (optional)" value={values.category} onChangeText={(v) => setValue('category', v)} error={errors.category} disabled={readOnly} />
+        </FieldGrid>
         <FormField label="Description (optional)" value={values.description} onChangeText={(v) => setValue('description', v)} error={errors.description} multiline disabled={readOnly} />
         <Row>
           <FormField style={styles.grow} label="Unit" value={values.unit} onChangeText={(v) => setValue('unit', v)} error={errors.unit} placeholder="e.g. tray" disabled={readOnly} />

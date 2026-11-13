@@ -112,7 +112,7 @@ export function AccountBlockedScreen({ message }: { message: string }) {
 export function AccountSecurityScreen() {
   const vm = useAccountSecurityViewModel();
   return (
-    <Screen>
+    <Screen variant="form">
       <Panel>
         <SectionHeader title="Change password" />
         <PasswordField

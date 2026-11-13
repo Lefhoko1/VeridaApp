@@ -164,6 +164,10 @@ Everything visual lives in `src/design-system`, so a view asks for a `HeroCard` 
 - **Buttons:** views import `Button` from the design system rather than Paper, for a consistent touch target.
 - **Headers:** tabs use a gradient. Stack screens use the solid brand colour, because a native header would have to become transparent, with its content moved beneath it, to show one.
 
+### The website on a wide window
+
+The same screens serve the app and the website. On the web, a window at least 1024px wide (`useWideLayout`) gets a desktop layout following the prototype in `docs/requirements`: a sidebar instead of tabs (`WebShell`, connected in `src/composition/WebShells.tsx`), a page title in place of the coloured header, wider pages, forms kept to a reading width (`<Screen variant="form">`), short fields two to a row (`FieldGrid`), panels side by side (`Columns`, `CardGrid`), lists as tables (`DataTable`), pickers as dialogs, and a split sign-in screen. Everywhere else, including the website on a phone, each of these renders exactly as the mobile layout, so a change for the website can't alter the app. Keep it that way: a view that needs a different website layout branches on `useWideLayout()` and leaves its mobile path untouched.
+
 Expo Go shows the app icon rather than the splash screen, so check the splash on a real build.
 
 ## Testing on a phone without a development server

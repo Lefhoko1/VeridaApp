@@ -18,6 +18,7 @@ export { Kicker, Panel, Row, Screen, SectionHeader, Stack } from './components/l
 export { Breathe, GrowBar, PressableScale, Reveal, Skeleton, TypingDots, entrance, motion } from './components/motion';
 export { TabIcon, brandHeader, tabBarOptions, tabBarSurface } from './components/navigation';
 export { WIDE_MIN_WIDTH, pageMaxWidth, useInShell, useWideLayout } from './components/responsive';
+export { CardGrid, Columns, DataTable, FieldGrid, type TableColumn } from './components/webLayout';
 export { PageHeader, WebShell, type ShellNavItem, type ShellNavSection } from './components/webShell';
 export { PermissionChecklist, type PermissionRow } from './components/permissions';
 export { EmptyState, ErrorView, LoadingView, Notice, StatusPill, type StatusTone } from './components/status';

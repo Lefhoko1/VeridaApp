@@ -4,7 +4,7 @@ import { Divider, List, Searchbar, Text } from 'react-native-paper';
 
 import { formatDate } from '@/core/format/format';
 import { CURRENCY_OPTIONS } from '@/core/geo/countries';
-import { Button, ConfirmDialog, DateField, EmptyState, ErrorView, FormField, LabelValue, LoadingView, Panel, PermissionChecklist, Row, Screen, SectionHeader, SelectField, StatusPill, spacing, supporting } from '@/design-system';
+import { Button, ConfirmDialog, DataTable, DateField, EmptyState, FieldGrid, ErrorView, FormField, LabelValue, LoadingView, Panel, PermissionChecklist, Row, Screen, SectionHeader, SelectField, StatusPill, spacing, supporting, useWideLayout } from '@/design-system';
 
 import { ACCOUNT_STATUS_OPTIONS, BUSINESS_STATUS_OPTIONS, MEMBER_ROLE_OPTIONS } from '../../domain/validation';
 import { BUSINESS_TONE, useBusinessDetailViewModel, useBusinessMemberPermissionsViewModel, useBusinessSearchViewModel } from '../viewmodels/useBusinessAdminViewModels';
@@ -14,25 +14,41 @@ const label = (status: string) => status.replace(/_/g, ' ');
 
 export function UserListScreen({ onOpen }: { onOpen: (id: string) => void }) {
   const vm = useUserSearchViewModel();
+  const wide = useWideLayout();
   return (
     <Screen>
       <SectionHeader title="Users" description="Search by name or email, and filter by status and registration date." />
-      <Searchbar placeholder="Name or email" value={vm.query} onChangeText={vm.setQuery} style={styles.search} />
-      <SelectField label="Account status" value={vm.status} options={ACCOUNT_STATUS_OPTIONS} onChange={vm.setStatus} />
-      <Row gap={spacing.sm}>
-        <View style={styles.half}>
-          <DateField label="Registered from" value={vm.from} onChangeText={vm.setFrom} />
-        </View>
-        <View style={styles.half}>
-          <DateField label="Registered to" value={vm.to} onChangeText={vm.setTo} />
-        </View>
-      </Row>
+      <FieldGrid>
+        <Searchbar placeholder="Name or email" value={vm.query} onChangeText={vm.setQuery} style={styles.search} />
+        <SelectField label="Account status" value={vm.status} options={ACCOUNT_STATUS_OPTIONS} onChange={vm.setStatus} />
+        <Row gap={spacing.sm}>
+          <View style={styles.half}>
+            <DateField label="Registered from" value={vm.from} onChangeText={vm.setFrom} />
+          </View>
+          <View style={styles.half}>
+            <DateField label="Registered to" value={vm.to} onChangeText={vm.setTo} />
+          </View>
+        </Row>
+      </FieldGrid>
       {vm.loading ? (
         <LoadingView />
       ) : vm.error ? (
         <ErrorView message={vm.error} onRetry={vm.retry} />
       ) : vm.items.length === 0 ? (
         <EmptyState illustration="search" title="No users match." />
+      ) : wide ? (
+        <DataTable
+          rows={vm.items}
+          rowKey={(user) => user.id}
+          onRowPress={(user) => onOpen(user.id)}
+          rowLabel={(user) => user.fullName}
+          columns={[
+            { key: 'name', title: 'Name', render: (user) => <Text style={styles.strong}>{user.fullName}</Text>, flex: 1.6 },
+            { key: 'email', title: 'Email', render: (user) => user.email, flex: 2 },
+            { key: 'registered', title: 'Registered', render: (user) => formatDate(user.createdAt.slice(0, 10)) },
+            { key: 'status', title: 'Status', render: (user) => <StatusPill label={label(user.accountStatus)} tone={STATUS_TONE[user.accountStatus]} /> },
+          ]}
+        />
       ) : (
         <Panel style={styles.list}>
           {vm.items.map((user, index) => (
@@ -141,19 +157,37 @@ export function UserDetailScreen({ userId }: { userId: string }) {
 
 export function BusinessListScreen({ onOpen }: { onOpen: (id: string) => void }) {
   const vm = useBusinessSearchViewModel();
+  const wide = useWideLayout();
   return (
     <Screen>
       <SectionHeader title="Businesses" description="Search by name, and filter by industry, location and status." />
-      <Searchbar placeholder="Business name" value={vm.query} onChangeText={vm.setQuery} style={styles.search} />
-      <SelectField label="Industry" value={vm.industry} options={vm.industryOptions} onChange={vm.setIndustry} />
-      <FormField label="Location" value={vm.location} onChangeText={vm.setLocation} />
-      <SelectField label="Status" value={vm.status} options={BUSINESS_STATUS_OPTIONS} onChange={vm.setStatus} />
+      <FieldGrid>
+        <Searchbar placeholder="Business name" value={vm.query} onChangeText={vm.setQuery} style={styles.search} />
+        <SelectField label="Industry" value={vm.industry} options={vm.industryOptions} onChange={vm.setIndustry} />
+        <FormField label="Location" value={vm.location} onChangeText={vm.setLocation} />
+        <SelectField label="Status" value={vm.status} options={BUSINESS_STATUS_OPTIONS} onChange={vm.setStatus} />
+      </FieldGrid>
       {vm.loading ? (
         <LoadingView />
       ) : vm.error ? (
         <ErrorView message={vm.error} onRetry={vm.retry} />
       ) : vm.items.length === 0 ? (
         <EmptyState illustration="search" title="No businesses match." />
+      ) : wide ? (
+        <DataTable
+          rows={vm.items}
+          rowKey={(business) => business.id}
+          onRowPress={(business) => onOpen(business.id)}
+          rowLabel={(business) => business.name}
+          columns={[
+            { key: 'name', title: 'Business', render: (business) => <Text style={styles.strong}>{business.name}</Text>, flex: 1.6 },
+            { key: 'industry', title: 'Industry', render: (business) => business.industryCode },
+            { key: 'location', title: 'Location', render: (business) => [business.location, business.country].filter(Boolean).join(', ') || '—', flex: 1.4 },
+            { key: 'owner', title: 'Owner', render: (business) => business.ownerEmail ?? 'None', flex: 1.8 },
+            { key: 'members', title: 'Members', render: (business) => String(business.memberCount), align: 'right', flex: 0.8 },
+            { key: 'status', title: 'Status', render: (business) => <StatusPill label={label(business.status)} tone={BUSINESS_TONE[business.status]} /> },
+          ]}
+        />
       ) : (
         <Panel style={styles.list}>
           {vm.items.map((business, index) => (
@@ -344,6 +378,7 @@ export function BusinessDetailScreen({ businessId, onOpenMember }: { businessId:
 }
 
 const styles = StyleSheet.create({
+  strong: { fontWeight: '600' },
   search: { backgroundColor: supporting.white, borderWidth: 1, borderColor: supporting.line },
   list: { padding: spacing.xs, gap: 0 },
   half: { flex: 1, minWidth: 0 },

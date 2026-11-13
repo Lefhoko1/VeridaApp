@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import { Dialog, Divider, List, Portal, Text } from 'react-native-paper';
 
 import { formatDate, formatQuantity } from '@/core/format/format';
-import { Button, BarRow, EmptyState, ErrorView, HeroCard, LabelValue, LoadingView, MetricCard, MetricGrid, Notice, Panel, Row, Screen, SectionHeader, StatusPill, palette, spacing, supporting, IconTile, motion } from '@/design-system';
+import { Button, BarRow, Columns, EmptyState, ErrorView, HeroCard, LabelValue, LoadingView, MetricCard, MetricGrid, Notice, Panel, Row, Screen, SectionHeader, StatusPill, palette, spacing, supporting, IconTile, motion, useWideLayout } from '@/design-system';
 
 import { PeriodSelector } from '../components/PeriodSelector';
 import { useDashboardViewModel, type PresentedKpi } from '../viewmodels/useAnalyticsViewModels';
@@ -15,6 +15,82 @@ const ACTIVITY_TILE = {
 
 export function DashboardScreen({ onAddRecord, onViewRecords }: { onAddRecord: () => void; onViewRecords: () => void }) {
   const vm = useDashboardViewModel();
+  const wide = useWideLayout();
+
+  const chart = (
+    <Panel>
+      <SectionHeader title={vm.chartTitle} description="A simple view of the information you've recorded" />
+      {vm.bars.hasData ? (
+        <>
+          <BarRow label="Revenue" ratio={vm.bars.revenue.ratio} value={vm.bars.revenue.display} />
+          <BarRow label="Expenses" ratio={vm.bars.expenses.ratio} value={vm.bars.expenses.display} tone="coral" delay={motion.stagger * 2} />
+        </>
+      ) : (
+        <EmptyState illustration="growth" title="Add your first record to see your activity here." />
+      )}
+    </Panel>
+  );
+
+  const more =
+    vm.otherKpis.length > 0 ? (
+      <Panel>
+        <SectionHeader title="More measures" description="Tap one to see how it is calculated." />
+        {vm.otherKpis.map((kpi, index) => (
+          <View key={kpi.code}>
+            {index > 0 ? <Divider /> : null}
+            <List.Item title={kpi.name} description={kpi.note ?? undefined} onPress={() => vm.selectKpi(kpi.code)} right={() => <Text style={styles.kpiValue}>{kpi.display}</Text>} />
+          </View>
+        ))}
+      </Panel>
+    ) : null;
+
+  const health = (
+    <Panel>
+      <SectionHeader title="My Business Health" description="How complete is your business information?" />
+      {vm.completeness.map((item) => (
+        <Row key={item.item}>
+          <IconTile icon={item.isStarted ? 'check' : 'circle-outline'} tone={item.isStarted ? 'mint' : 'neutral'} size={32} />
+          <Text variant="bodyMedium" style={styles.grow}>
+            {item.label}
+          </Text>
+          <StatusPill label={item.isStarted ? 'Started' : 'To set up'} tone={item.isStarted ? 'ok' : 'warn'} />
+        </Row>
+      ))}
+    </Panel>
+  );
+
+  const recent = (
+    <>
+      <SectionHeader
+        title="Recent activity"
+        description="The latest information you've added"
+        action={
+          <Button mode="contained-tonal" compact onPress={onViewRecords}>
+            View records
+          </Button>
+        }
+      />
+      {vm.recent.length === 0 ? (
+        <EmptyState illustration="ledger" title="No records yet." description="Add your first business record to begin." />
+      ) : (
+        <Panel style={styles.list}>
+          {vm.recent.map((item, index) => (
+            <View key={item.id}>
+              {index > 0 ? <Divider /> : null}
+              <List.Item
+                title={item.label}
+                description={formatDate(item.occurredOn)}
+                left={() => <IconTile icon={ACTIVITY_TILE[item.kind].icon} tone={ACTIVITY_TILE[item.kind].tone} />}
+                right={() => (
+                  <Text style={styles.kpiValue}>{item.amount !== null ? vm.money(item.amount) : `${formatQuantity(item.quantity ?? 0)} ${item.unit ?? ''}`}</Text>
+                )}
+              />
+            </View>
+          ))}
+        </Panel>
+      )}
+    </>
+  );
 
   return (
     <Screen refreshing={vm.refreshing} onRefresh={vm.refresh}>
@@ -47,73 +123,29 @@ export function DashboardScreen({ onAddRecord, onViewRecords }: { onAddRecord: (
             ))}
           </MetricGrid>
 
-          <Panel>
-            <SectionHeader title={vm.chartTitle} description="A simple view of the information you've recorded" />
-            {vm.bars.hasData ? (
+          {wide ? (
+            // The website: the picture of the business on the left, what to look at next on the right.
+            <Columns weights={[1.35, 1]}>
               <>
-                <BarRow label="Revenue" ratio={vm.bars.revenue.ratio} value={vm.bars.revenue.display} />
-                <BarRow label="Expenses" ratio={vm.bars.expenses.ratio} value={vm.bars.expenses.display} tone="coral" delay={motion.stagger * 2} />
+                {chart}
+                {recent}
               </>
-            ) : (
-              <EmptyState illustration="growth" title="Add your first record to see your activity here." />
-            )}
-          </Panel>
-
-          {vm.otherKpis.length > 0 ? (
-            <Panel>
-              <SectionHeader title="More measures" description="Tap one to see how it is calculated." />
-              {vm.otherKpis.map((kpi, index) => (
-                <View key={kpi.code}>
-                  {index > 0 ? <Divider /> : null}
-                  <List.Item title={kpi.name} description={kpi.note ?? undefined} onPress={() => vm.selectKpi(kpi.code)} right={() => <Text style={styles.kpiValue}>{kpi.display}</Text>} />
-                </View>
-              ))}
-            </Panel>
-          ) : null}
-
-          <Panel>
-            <SectionHeader title="My Business Health" description="How complete is your business information?" />
-            {vm.completeness.map((item) => (
-              <Row key={item.item}>
-                <IconTile icon={item.isStarted ? 'check' : 'circle-outline'} tone={item.isStarted ? 'mint' : 'neutral'} size={32} />
-                <Text variant="bodyMedium" style={styles.grow}>
-                  {item.label}
-                </Text>
-                <StatusPill label={item.isStarted ? 'Started' : 'To set up'} tone={item.isStarted ? 'ok' : 'warn'} />
-              </Row>
-            ))}
-          </Panel>
+              <>
+                {health}
+                {more}
+              </>
+            </Columns>
+          ) : (
+            <>
+              {chart}
+              {more}
+              {health}
+            </>
+          )}
         </>
       )}
 
-      <SectionHeader
-        title="Recent activity"
-        description="The latest information you've added"
-        action={
-          <Button mode="contained-tonal" compact onPress={onViewRecords}>
-            View records
-          </Button>
-        }
-      />
-      {vm.recent.length === 0 ? (
-        <EmptyState illustration="ledger" title="No records yet." description="Add your first business record to begin." />
-      ) : (
-        <Panel style={styles.list}>
-          {vm.recent.map((item, index) => (
-            <View key={item.id}>
-              {index > 0 ? <Divider /> : null}
-              <List.Item
-                title={item.label}
-                description={formatDate(item.occurredOn)}
-                left={() => <IconTile icon={ACTIVITY_TILE[item.kind].icon} tone={ACTIVITY_TILE[item.kind].tone} />}
-                right={() => (
-                  <Text style={styles.kpiValue}>{item.amount !== null ? vm.money(item.amount) : `${formatQuantity(item.quantity ?? 0)} ${item.unit ?? ''}`}</Text>
-                )}
-              />
-            </View>
-          ))}
-        </Panel>
-      )}
+      {wide ? null : recent}
 
       <KpiDetailDialog kpi={vm.selectedKpi} onDismiss={() => vm.selectKpi(null)} />
     </Screen>
