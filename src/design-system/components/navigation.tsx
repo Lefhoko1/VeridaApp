@@ -26,11 +26,11 @@ export function TabIcon({ icon, activeIcon, color, focused, size = 22 }: { icon:
 
 const headerTitleStyle = { fontFamily: FONT_FAMILY, fontWeight: '700', fontSize: 17 } as const;
 
-// Shared by every stack. A native header can't draw over a custom background without becoming
-// transparent, so stacks use the solid brand colour, and the tabs add the gradient on top of this.
+// Shared by every stack: a white header with deep teal text, matching the light sidebar of the
+// updated design. The tabs add a fine line under it through HeaderBackdrop.
 export const brandHeader = {
-  headerStyle: { backgroundColor: palette.deepTeal },
-  headerTintColor: supporting.white,
+  headerStyle: { backgroundColor: supporting.white },
+  headerTintColor: palette.deepTeal,
   headerTitleStyle,
   headerShadowVisible: false,
 } as const;

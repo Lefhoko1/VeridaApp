@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import { Badge, Divider, IconButton, List, Switch } from 'react-native-paper';
 
 import { formatDate } from '@/core/format/format';
-import { Button, EmptyState, ErrorView, LoadingView, Panel, Screen, SectionHeader, palette, spacing, supporting, IconTile } from '@/design-system';
+import { Button, EmptyState, ErrorView, LoadingView, Panel, Screen, SectionHeader, palette, spacing, IconTile } from '@/design-system';
 
 import type { AppNotification } from '../../domain/models';
 import { useNotificationsViewModel, useUnreadCount } from '../viewmodels/useNotificationsViewModel';
@@ -20,7 +20,7 @@ export function NotificationBell({ onPress }: { onPress: () => void }) {
   const unread = useUnreadCount();
   return (
     <View>
-      <IconButton icon="bell-outline" iconColor={supporting.white} onPress={onPress} accessibilityLabel={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'} />
+      <IconButton icon="bell-outline" iconColor={palette.deepTeal} onPress={onPress} accessibilityLabel={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'} />
       {unread > 0 ? (
         <Badge size={16} style={styles.badge}>
           {unread}

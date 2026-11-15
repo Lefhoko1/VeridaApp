@@ -7,13 +7,24 @@ export const palette = {
   mutedCoral: '#E69A7A', // Small accents
 } as const;
 
-// Supporting tones taken from the prototype. They carry text and status on top of the palette,
-// where the five brand colours alone would not meet contrast requirements.
+// Supporting tones from the updated design (Verida_Hero_Image_Right_Updated). They carry text and
+// status on top of the palette, where the five brand colours alone would not meet contrast requirements.
 export const supporting = {
   white: '#FFFFFF',
-  ink: '#111827',
-  mutedText: '#53616A',
-  line: '#E7E6DE',
+  ink: '#182D31',
+  mutedText: '#5F7477',
+  line: '#E3EBE6',
+  eyebrowWash: '#E9F5EF',
+  eyebrowText: '#17675C',
+  // The signed-in app's light surfaces (Verida_All_Pages_With_Hero_Design).
+  pageWash: '#F7FAF8',
+  navText: '#506F70',
+  navHover: '#EFF7F3',
+  navActive: '#E4F3EB',
+  bizWash: '#F4F9F6',
+  bizBorder: '#E0EBE5',
+  gridLine: '#E5EEE8',
+  axisLine: '#CDDFD4',
   mintBorder: '#B9D9D1',
   mintWash: '#F0F6F3',
   coralWash: '#FFF4EC',

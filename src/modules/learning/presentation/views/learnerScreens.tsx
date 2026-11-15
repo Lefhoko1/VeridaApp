@@ -20,7 +20,7 @@ export function LearnScreen({ onOpenLesson, onOpenPreferences, onOpenReview }: L
 
   return (
     <Screen refreshing={vm.refreshing} onRefresh={vm.refresh}>
-      <HeroCard scene="learn" kicker="Verida Learn" title="A lesson a week, shaped around your business." body="A learning journey that grows with you." />
+      <HeroCard kicker="Verida Learn" title="A lesson a week, shaped around your business." body="A learning journey that grows with you." />
 
       <Panel>
         <SectionHeader

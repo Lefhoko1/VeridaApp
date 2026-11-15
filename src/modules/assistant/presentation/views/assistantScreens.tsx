@@ -64,9 +64,9 @@ export function AskScreen({ conversationId, onCapture, onOpenHistory }: AskScree
         <Reveal key={message.id} style={message.role === 'user' ? styles.userRow : styles.assistantRow}>
           {message.role === 'user' ? null : <IconTile icon="creation" size={32} />}
           <View style={[styles.bubble, message.role === 'user' ? styles.userBubble : styles.assistantBubble]}>
-          <Text variant="bodyMedium" accessibilityLabel={`${message.role === 'user' ? 'You' : 'Verida'}: ${message.content}`}>{message.content}</Text>
+          <Text variant="bodyMedium" style={message.role === 'user' ? styles.userText : undefined} accessibilityLabel={`${message.role === 'user' ? 'You' : 'Verida'}: ${message.content}`}>{message.content}</Text>
           {message.confidence ? <StatusPill label={CONFIDENCE_LABEL[message.confidence].label} tone={CONFIDENCE_LABEL[message.confidence].tone} /> : null}
-          {message.missingFields?.length ? <Text variant="bodySmall">Still needed: {message.missingFields.join(', ')}</Text> : null}
+          {message.missingFields?.length ? <Text variant="bodySmall" style={message.role === 'user' ? styles.userText : undefined}>Still needed: {message.missingFields.join(', ')}</Text> : null}
           {message.suggestedCapture ? (
             <Button mode="outlined" compact onPress={() => onCapture(message.suggestedCapture as CaptureTarget, message.capturePrefill ?? {})}>
               {CAPTURE_LABEL[message.suggestedCapture]}
@@ -137,8 +137,10 @@ const styles = StyleSheet.create({
   assistantRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, maxWidth: '94%' },
   userRow: { alignSelf: 'flex-end', maxWidth: '88%' },
   bubble: { flexShrink: 1, padding: spacing.md, borderRadius: radius.lg, gap: spacing.sm, ...shadows.soft },
-  assistantBubble: { backgroundColor: supporting.white, borderTopLeftRadius: radius.sm },
-  userBubble: { backgroundColor: palette.softMint, borderTopRightRadius: radius.sm },
+  // The updated design: Verida's replies on a mint wash, the person's own words on deep teal.
+  assistantBubble: { backgroundColor: supporting.mintWash, borderWidth: 1, borderColor: palette.softMint, borderTopLeftRadius: radius.sm },
+  userBubble: { backgroundColor: palette.deepTeal, borderTopRightRadius: radius.sm },
+  userText: { color: supporting.white },
   prompt: { backgroundColor: supporting.white },
   composerBar: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: supporting.white, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: supporting.line },
   composer: { flex: 1, backgroundColor: supporting.white },

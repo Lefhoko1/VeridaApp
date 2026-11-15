@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 
 import { WorkspaceWebShell, webHeader } from '@/composition/WebShells';
-import { brandHeader, palette, useWideLayout } from '@/design-system';
+import { brandHeader, supporting, useWideLayout } from '@/design-system';
 import { useActiveBusiness } from '@/modules/business';
 
 const SCREEN_TITLES: Record<string, string> = {
@@ -49,7 +49,7 @@ export default function WorkspaceLayout() {
       screenOptions={{
         ...brandHeader,
         ...(wide ? { header: webHeader(business.name) } : null),
-        contentStyle: { backgroundColor: palette.warmIvory },
+        contentStyle: { backgroundColor: supporting.pageWash },
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 
 import { PlatformWebShell, webHeader } from '@/composition/WebShells';
-import { brandHeader, palette, useWideLayout } from '@/design-system';
+import { brandHeader, supporting, useWideLayout } from '@/design-system';
 
 const SCREEN_TITLES: Record<string, string> = {
   platform: 'Verida platform',
@@ -36,7 +36,7 @@ export default function PlatformLayout() {
       screenOptions={{
         ...brandHeader,
         ...(wide ? { header: webHeader('Verida platform') } : null),
-        contentStyle: { backgroundColor: palette.warmIvory },
+        contentStyle: { backgroundColor: supporting.pageWash },
       }}
     >
       {Object.entries(SCREEN_TITLES).map(([name, title]) => (

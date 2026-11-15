@@ -4,8 +4,8 @@ import { Icon, IconButton, Text } from 'react-native-paper';
 
 import { palette, supporting } from '../theme/palette';
 import { radius, spacing } from '../theme/theme';
+import { IconTile } from './art';
 import { BrandLogo } from './brand';
-import { Kicker } from './layout';
 import { pageMaxWidth, ShellProvider } from './responsive';
 
 export type ShellNavItem = { key: string; label: string; icon: string; active: boolean; onPress: () => void; badge?: number };
@@ -13,7 +13,7 @@ export type ShellNavSection = { title?: string; items: ShellNavItem[] };
 
 const SIDEBAR_WIDTH = 250;
 
-// The website's desktop layout, following the prototype: a deep teal sidebar with the brand, the
+// The website's desktop layout, following the updated design: a white sidebar with the brand, the
 // current business and the navigation, beside the page. Only used on wide windows on the web.
 export function WebShell({ heading, caption, sections, children }: { heading: string; caption?: string; sections: ShellNavSection[]; children: ReactNode }) {
   return (
@@ -21,14 +21,17 @@ export function WebShell({ heading, caption, sections, children }: { heading: st
       <View style={styles.side} role="navigation">
         <ScrollView contentContainerStyle={styles.sideContent}>
           <View>
-            <BrandLogo size={29} inverse />
-            <Text style={styles.tagline}>YOUR INTELLIGENT BUSINESS COMPANION</Text>
+            <BrandLogo size={31} />
+            <Text style={styles.tagline}>INTELLIGENT BUSINESS</Text>
           </View>
           <View style={styles.bizbox}>
-            <Text style={styles.bizName} numberOfLines={2}>
-              {heading}
-            </Text>
-            {caption ? <Text style={styles.bizCaption}>{caption}</Text> : null}
+            <IconTile icon="storefront-outline" size={38} />
+            <View style={styles.fill}>
+              <Text style={styles.bizName} numberOfLines={2}>
+                {heading}
+              </Text>
+              {caption ? <Text style={styles.bizCaption}>{caption}</Text> : null}
+            </View>
           </View>
           {sections.map((section, index) => (
             <View key={section.title ?? index} style={styles.section}>
@@ -54,10 +57,10 @@ function NavButton({ item }: { item: ShellNavItem }) {
       role="link"
       aria-current={item.active ? 'page' : undefined}
       accessibilityLabel={item.badge ? `${item.label}, ${item.badge} unread` : item.label}
-      style={(state) => [styles.navButton, (item.active || (state as { hovered?: boolean }).hovered) && styles.navButtonActive]}
+      style={(state) => [styles.navButton, (state as { hovered?: boolean }).hovered && styles.navButtonHover, item.active && styles.navButtonActive]}
     >
       {item.active ? <View style={styles.activeBar} /> : null}
-      <Icon source={item.icon} size={19} color={item.active ? supporting.white : palette.softMint} />
+      <Icon source={item.icon} size={19} color={item.active ? supporting.eyebrowText : supporting.navText} />
       <Text style={[styles.navLabel, item.active && styles.navLabelActive]} numberOfLines={1}>
         {item.label}
       </Text>
@@ -70,45 +73,57 @@ function NavButton({ item }: { item: ShellNavItem }) {
   );
 }
 
-// The title area at the top of each page on the website, in place of the app's coloured header.
+// The top of each page on the website, in place of the app's header: a white bar with where you
+// are, then the page title, as in the updated design.
 export function PageHeader({ title, kicker, onBack, actions }: { title: string; kicker?: string; onBack?: () => void; actions?: ReactNode }) {
   return (
-    <View style={styles.header}>
-      <View style={styles.headerInner}>
-        {onBack ? <IconButton icon="arrow-left" iconColor={palette.deepTeal} onPress={onBack} accessibilityLabel="Back" style={styles.back} /> : null}
-        <View style={styles.fill}>
-          {kicker ? <Kicker>{kicker}</Kicker> : null}
-          <Text style={styles.title} role="heading" aria-level={1} numberOfLines={1}>
-            {title}
-          </Text>
+    <View>
+      <View style={styles.topBar}>
+        <Text style={styles.crumb} numberOfLines={1}>
+          {kicker ? `${kicker}   /   ` : ''}
+          <Text style={styles.crumbCurrent}>{title}</Text>
+        </Text>
+      </View>
+      <View style={styles.header}>
+        <View style={styles.headerInner}>
+          {onBack ? <IconButton icon="arrow-left" iconColor={palette.deepTeal} onPress={onBack} accessibilityLabel="Back" style={styles.back} /> : null}
+          <View style={styles.fill}>
+            <Text style={styles.title} role="heading" aria-level={1} numberOfLines={1}>
+              {title}
+            </Text>
+          </View>
+          {actions}
         </View>
-        {actions}
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  shell: { flex: 1, flexDirection: 'row', backgroundColor: palette.warmIvory },
-  side: { width: SIDEBAR_WIDTH, backgroundColor: palette.deepTeal },
-  sideContent: { flexGrow: 1, paddingVertical: 25, paddingHorizontal: 17, gap: spacing.xl },
-  tagline: { color: palette.softMint, fontSize: 10, letterSpacing: 1.2, marginTop: 2 },
-  bizbox: { padding: 13, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.11)', borderRadius: 13, gap: 2 },
-  bizName: { color: supporting.white, fontWeight: '700' },
-  bizCaption: { color: palette.softMint, fontSize: 12 },
-  section: { gap: 5 },
-  sectionTitle: { color: '#B8D0C7', fontSize: 10, fontWeight: '700', letterSpacing: 1.2, paddingHorizontal: 12, marginBottom: 2 },
-  navButton: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: 11, paddingHorizontal: 12, borderRadius: 9 },
-  navButtonActive: { backgroundColor: 'rgba(255,255,255,0.1)' },
-  activeBar: { position: 'absolute', left: 0, top: 10, bottom: 10, width: 3, borderRadius: 2, backgroundColor: palette.mutedCoral },
-  navLabel: { flex: 1, color: palette.softMint, fontSize: 14 },
-  navLabelActive: { color: supporting.white, fontWeight: '600' },
+  shell: { flex: 1, flexDirection: 'row', backgroundColor: supporting.pageWash },
+  side: { width: SIDEBAR_WIDTH, backgroundColor: supporting.white, borderRightWidth: 1, borderRightColor: supporting.line },
+  sideContent: { flexGrow: 1, paddingVertical: 28, paddingHorizontal: 14, gap: spacing.xl },
+  tagline: { color: supporting.mutedText, fontSize: 9, fontWeight: '600', letterSpacing: 1.65, marginTop: 3 },
+  bizbox: { flexDirection: 'row', alignItems: 'center', gap: 11, padding: 14, backgroundColor: supporting.bizWash, borderWidth: 1, borderColor: supporting.bizBorder, borderRadius: 13 },
+  bizName: { color: palette.deepTeal, fontWeight: '700', fontSize: 13 },
+  bizCaption: { color: supporting.mutedText, fontSize: 11, marginTop: 3 },
+  section: { gap: 4 },
+  sectionTitle: { color: supporting.mutedText, fontSize: 10, fontWeight: '800', letterSpacing: 1.4, paddingHorizontal: 14, marginBottom: 4 },
+  navButton: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 13, paddingHorizontal: 14, borderRadius: 10 },
+  navButtonHover: { backgroundColor: supporting.navHover },
+  navButtonActive: { backgroundColor: supporting.navActive },
+  activeBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, borderTopLeftRadius: 10, borderBottomLeftRadius: 10, backgroundColor: palette.teal },
+  navLabel: { flex: 1, color: supporting.navText, fontSize: 13, fontWeight: '600' },
+  navLabelActive: { color: supporting.eyebrowText, fontWeight: '700' },
   badge: { minWidth: 20, paddingHorizontal: 6, height: 20, borderRadius: 10, backgroundColor: palette.mutedCoral, alignItems: 'center', justifyContent: 'center' },
   badgeText: { color: palette.deepTeal, fontSize: 11, fontWeight: '700' },
   main: { flex: 1, minWidth: 0 },
-  header: { backgroundColor: palette.warmIvory, paddingTop: 28, alignItems: 'center' },
+  topBar: { height: 76, justifyContent: 'center', paddingHorizontal: 37, backgroundColor: supporting.white, borderBottomWidth: 1, borderBottomColor: supporting.line },
+  crumb: { color: supporting.mutedText, fontSize: 12 },
+  crumbCurrent: { color: palette.deepTeal, fontWeight: '700' },
+  header: { backgroundColor: supporting.pageWash, paddingTop: 34, alignItems: 'center' },
   headerInner: { width: '100%', maxWidth: pageMaxWidth, paddingHorizontal: spacing.xl, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   back: { marginLeft: -spacing.sm, borderRadius: radius.md },
   fill: { flex: 1 },
-  title: { fontSize: 27, fontWeight: '800', letterSpacing: -0.8, color: supporting.ink },
+  title: { fontSize: 32, fontWeight: '800', letterSpacing: -1.35, color: palette.deepTeal },
 });

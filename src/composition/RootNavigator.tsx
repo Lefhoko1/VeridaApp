@@ -46,7 +46,7 @@ export function RootNavigator() {
 
   return (
     <>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Protected guard={!isSignedIn}>

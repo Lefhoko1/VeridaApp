@@ -2,7 +2,7 @@ import { Children, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Icon, Text } from 'react-native-paper';
 
-import { palette, supporting } from '../theme/palette';
+import { supporting } from '../theme/palette';
 import { radius, shadows, spacing } from '../theme/theme';
 import { useWideLayout } from './responsive';
 
@@ -156,6 +156,6 @@ const styles = StyleSheet.create({
   cellText: { fontSize: 14, color: supporting.ink },
   right: { textAlign: 'right' },
   muted: { color: supporting.mutedText, textDecorationLine: 'line-through' },
-  hovered: { backgroundColor: palette.warmIvory },
+  hovered: { backgroundColor: supporting.navHover },
   chevron: { width: 24, alignItems: 'flex-end' },
 });

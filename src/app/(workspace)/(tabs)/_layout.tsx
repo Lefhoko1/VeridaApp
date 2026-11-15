@@ -4,7 +4,7 @@ import { IconButton } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { webHeader } from '@/composition/WebShells';
-import { brandHeader, HeaderBackdrop, supporting, TabIcon, tabBarOptions, tabBarSurface, useWideLayout } from '@/design-system';
+import { brandHeader, HeaderBackdrop, palette, TabIcon, tabBarOptions, tabBarSurface, useWideLayout } from '@/design-system';
 import { useActiveBusiness } from '@/modules/business';
 import { NotificationBell } from '@/modules/notifications';
 
@@ -21,8 +21,8 @@ function HeaderActions() {
   return (
     <View style={{ flexDirection: 'row' }}>
       <NotificationBell onPress={() => router.push('/notifications')} />
-      <IconButton icon="domain" iconColor={supporting.white} accessibilityLabel="My business" onPress={() => router.push('/business')} />
-      <IconButton icon="account-circle-outline" iconColor={supporting.white} accessibilityLabel="My account" onPress={() => router.push('/account')} />
+      <IconButton icon="domain" iconColor={palette.deepTeal} accessibilityLabel="My business" onPress={() => router.push('/business')} />
+      <IconButton icon="account-circle-outline" iconColor={palette.deepTeal} accessibilityLabel="My account" onPress={() => router.push('/account')} />
     </View>
   );
 }

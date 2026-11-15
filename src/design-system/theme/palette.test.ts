@@ -45,6 +45,12 @@ describe('colour palette', () => {
     ['selected tab on mint', palette.deepTeal, palette.softMint],
     ['header text at the bright end of the gradient', supporting.white, palette.teal],
     ['coral tile icon', supporting.coralText, supporting.coralWash],
+    ['eyebrow label', supporting.eyebrowText, supporting.eyebrowWash],
+    ['sidebar link', supporting.navText, supporting.white],
+    ['sidebar link on hover', supporting.navText, supporting.navHover],
+    ['active sidebar link', supporting.eyebrowText, supporting.navActive],
+    ['muted text on the page', supporting.mutedText, supporting.pageWash],
+    ['user chat bubble', supporting.white, palette.deepTeal],
   ])('%s meets WCAG AA', (_name, foreground, background) => {
     expect(contrast(foreground, background)).toBeGreaterThanOrEqual(WCAG_AA_TEXT);
   });

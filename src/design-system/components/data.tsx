@@ -54,6 +54,9 @@ export function BarRow({ label, ratio, value, tone = 'teal', delay = 0 }: { labe
 export type GroupedBar = { key: string; label: string; primary: number; secondary: number };
 
 const CHART_HEIGHT = 120;
+// Faint guide lines behind the bars, as in the updated design. LABEL_SPACE is the period label's row under the bars.
+const GRID_LINES = [1, 2, 3, 4];
+const LABEL_SPACE = 19;
 
 // Revenue against expenses by period, as in the prototype's monthly pattern chart.
 export function GroupedBarChart({ data, primaryLabel, secondaryLabel }: { data: GroupedBar[]; primaryLabel: string; secondaryLabel: string }) {
@@ -62,6 +65,9 @@ export function GroupedBarChart({ data, primaryLabel, secondaryLabel }: { data: 
   return (
     <View accessibilityRole="image" accessibilityLabel={data.map((d) => `${d.label}: ${primaryLabel} ${d.primary}, ${secondaryLabel} ${d.secondary}`).join('. ')}>
       <View style={styles.chart}>
+        {GRID_LINES.map((step) => (
+          <View key={step} style={[styles.gridLine, { bottom: LABEL_SPACE + (CHART_HEIGHT * step) / GRID_LINES.length }]} />
+        ))}
         {data.map((item, index) => (
           <View key={item.key} style={styles.chartGroup}>
             <View style={styles.chartBars}>
@@ -186,7 +192,8 @@ const styles = StyleSheet.create({
   barValue: { width: 88, textAlign: 'right', fontSize: 12, fontWeight: '700', color: palette.deepTeal },
   chart: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around', gap: spacing.xs, paddingTop: spacing.sm },
   chartGroup: { alignItems: 'center', gap: spacing.xs, flex: 1 },
-  chartBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: CHART_HEIGHT },
+  chartBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: CHART_HEIGHT, borderBottomWidth: 1, borderBottomColor: '#CDDFD4', alignSelf: 'stretch', justifyContent: 'center' },
+  gridLine: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: '#E5EEE8' },
   chartLabel: { fontSize: 11, color: supporting.mutedText },
   legend: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.sm },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },

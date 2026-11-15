@@ -19,7 +19,7 @@ export function InsightsScreen() {
 
   return (
     <Screen refreshing={vm.refreshing} onRefresh={vm.refresh}>
-      <HeroCard scene="insights" kicker="My insights" title="See what your records are telling you." body="Patterns and suggestions, drawn only from what you have entered." />
+      <HeroCard kicker="My insights" title="See what your records are telling you." body="Patterns and suggestions, drawn only from what you have entered." />
       <PeriodSelector control={vm.periodControl} />
 
       <Panel>

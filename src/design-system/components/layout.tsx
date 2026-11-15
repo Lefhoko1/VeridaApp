@@ -29,19 +29,21 @@ export function Screen(props: ScreenProps) {
   return <MobileScreen {...props} hero={undefined} wide />;
 }
 
-// The website on a wide window, for pages with a picture and no sidebar, such as sign-in: the
-// picture fills one side and the form sits on the other.
+// The website on a wide window, for pages with a picture and no sidebar, such as sign-in: the form
+// sits on the left and the picture on the right as a rounded card, as in the updated design.
 function SplitScreen({ children, footer, hero }: ScreenProps) {
   return (
     <View style={[styles.screen, styles.split]}>
-      <View style={styles.splitPicture}>
-        <HeroFillProvider value>{hero}</HeroFillProvider>
-      </View>
       <View style={styles.fill}>
         <ScrollView contentContainerStyle={styles.splitScroll} keyboardShouldPersistTaps="handled">
           <View style={[styles.content, styles.splitContent]}>{children}</View>
         </ScrollView>
         {footer}
+      </View>
+      <View style={styles.splitPicture}>
+        <View style={styles.splitPictureCard}>
+          <HeroFillProvider value>{hero}</HeroFillProvider>
+        </View>
       </View>
     </View>
   );
@@ -108,12 +110,17 @@ export function Stack({ children, gap = spacing.md }: { children: ReactNode; gap
   return <View style={{ gap }}>{children}</View>;
 }
 
+// A short uppercase label above a heading, drawn as a soft pill as in the updated design.
 export function Kicker({ children, inverse = false }: { children: string; inverse?: boolean }) {
-  return <Text style={[styles.kicker, inverse && styles.kickerInverse]}>{children.toUpperCase()}</Text>;
+  return (
+    <View style={[styles.kickerPill, inverse && styles.kickerPillInverse]}>
+      <Text style={[styles.kicker, inverse && styles.kickerInverse]}>{children.toUpperCase()}</Text>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: palette.warmIvory },
+  screen: { flex: 1, backgroundColor: supporting.pageWash },
   scroll: { flexGrow: 1, alignItems: 'center', paddingBottom: spacing.xxl * 2 },
   scrollWithHero: { flexGrow: 1 },
   sheet: {
@@ -122,7 +129,7 @@ const styles = StyleSheet.create({
     marginTop: -radius.xxl,
     paddingTop: spacing.sm,
     paddingBottom: spacing.xxl,
-    backgroundColor: palette.warmIvory,
+    backgroundColor: supporting.pageWash,
     borderTopLeftRadius: radius.xxl,
     borderTopRightRadius: radius.xxl,
   },
@@ -130,7 +137,8 @@ const styles = StyleSheet.create({
   wideContent: { maxWidth: pageMaxWidth, paddingHorizontal: spacing.xl, paddingTop: spacing.lg },
   formContent: { maxWidth: 820, alignSelf: 'flex-start' },
   split: { flexDirection: 'row' },
-  splitPicture: { flex: 1, maxWidth: 640 },
+  splitPicture: { flex: 1.1, maxWidth: 720, padding: 28 },
+  splitPictureCard: { flex: 1, borderRadius: 24, overflow: 'hidden', boxShadow: '0px 18px 48px rgba(21, 60, 70, 0.09)' },
   splitScroll: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: spacing.xxl },
   splitContent: { maxWidth: 480, flexGrow: 0 },
   fill: { flex: 1 },
@@ -149,6 +157,8 @@ const styles = StyleSheet.create({
   muted: { color: supporting.mutedText },
   row: { flexDirection: 'row', alignItems: 'center' },
   wrap: { flexWrap: 'wrap' },
-  kicker: { fontSize: 11, fontWeight: '700', letterSpacing: 1.3, color: palette.teal },
+  kickerPill: { alignSelf: 'flex-start', backgroundColor: supporting.eyebrowWash, borderRadius: 100, paddingHorizontal: 12, paddingVertical: 6 },
+  kickerPillInverse: { backgroundColor: 'rgba(255, 255, 255, 0.12)' },
+  kicker: { fontSize: 11, lineHeight: 14, fontWeight: '800', letterSpacing: 0.4, color: supporting.eyebrowText },
   kickerInverse: { color: palette.softMint },
 });

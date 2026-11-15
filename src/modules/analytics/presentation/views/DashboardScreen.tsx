@@ -100,7 +100,7 @@ export function DashboardScreen({ onAddRecord, onViewRecords }: { onAddRecord: (
         body={`A clearer picture of ${vm.businessName} starts with a few simple records.`}
         action={
           vm.canCreateRecords ? (
-            <Button mode="contained" buttonColor={palette.softMint} textColor={palette.deepTeal} icon="plus" onPress={onAddRecord}>
+            <Button mode="contained" icon="plus" onPress={onAddRecord}>
               Add a record
             </Button>
           ) : null

@@ -14,10 +14,10 @@ export const gradients = {
   barCoral: ['#F2B79C', palette.mutedCoral],
 } as const;
 
-// One soft shadow, from the prototype, so that surfaces lift rather than sit in boxes.
+// Soft shadows from the updated design, so that surfaces lift gently off the light page.
 export const shadows = {
-  soft: { boxShadow: '0px 6px 20px rgba(21, 60, 70, 0.07)' },
-  raised: { boxShadow: '0px 10px 28px rgba(21, 60, 70, 0.14)' },
+  soft: { boxShadow: '0px 5px 20px rgba(21, 60, 70, 0.05)' },
+  raised: { boxShadow: '0px 8px 32px rgba(21, 60, 70, 0.08)' },
 } as const;
 
 const baseFonts = configureFonts({ config: { fontFamily: FONT_FAMILY } });
@@ -52,7 +52,7 @@ export const veridaTheme: MD3Theme = {
     onTertiary: palette.deepTeal,
     tertiaryContainer: supporting.coralWash,
     onTertiaryContainer: supporting.coralText,
-    background: palette.warmIvory,
+    background: supporting.pageWash,
     onBackground: supporting.ink,
     surface: supporting.white,
     onSurface: supporting.ink,

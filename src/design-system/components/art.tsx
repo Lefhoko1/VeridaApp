@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, type ReactNode } from 'react';
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Icon, Text } from 'react-native-paper';
@@ -7,11 +8,11 @@ import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, w
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { palette, supporting } from '../theme/palette';
-import { gradients, radius, shadows, spacing } from '../theme/theme';
+import { gradients, shadows, spacing } from '../theme/theme';
 import { BrandLogo } from './brand';
 import { Kicker } from './layout';
 import { entrance, motion } from './motion';
-import { useHeroFill } from './responsive';
+import { useHeroFill, useWideLayout } from './responsive';
 
 // Original artwork in the Verida palette. Sources are in assets/source. All of it is decorative
 // unless a label is passed, so screen readers skip it by default.
@@ -35,6 +36,8 @@ const ILLUSTRATIONS = {
 export type IllustrationName = keyof typeof ILLUSTRATIONS;
 
 export const SCENES = {
+  // The updated design's hero photo: business owners across industries.
+  owners: require('../../../assets/scenes/business-owners.png'),
   savanna: require('../../../assets/scenes/savanna.webp'),
   overview: require('../../../assets/scenes/hero-overview.webp'),
   learn: require('../../../assets/scenes/hero-learn.webp'),
@@ -82,7 +85,7 @@ const HERO_HEIGHT = { min: 230, ratio: 0.36, max: 380 };
 
 // The full-width picture at the top of screens with no header: sign-in, sign-up and first setup.
 // Screen draws its content as a sheet that overlaps the bottom edge.
-export function SceneHeader({ scene = 'savanna', tagline, children }: { scene?: SceneName; tagline?: string; children?: ReactNode }) {
+export function SceneHeader({ scene = 'owners', tagline, children }: { scene?: SceneName; tagline?: string; children?: ReactNode }) {
   const { height } = useWindowDimensions();
   const { top } = useSafeAreaInsets();
   const drift = usePictureDrift();
@@ -94,11 +97,19 @@ export function SceneHeader({ scene = 'savanna', tagline, children }: { scene?: 
         <Image source={SCENES[scene]} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="center" transition={motion.base} />
       </Animated.View>
       <LinearGradient colors={['rgba(21, 60, 70, 0.55)', 'rgba(21, 60, 70, 0)']} locations={[0, 0.7]} style={StyleSheet.absoluteFill} />
+      {/* The rest of the app is light with a dark status bar; over this photo's dark top it turns light. */}
+      <StatusBar style="light" />
       <View style={[styles.sceneContent, { paddingTop: top + spacing.xl }]}>
         <BrandLogo size={38} inverse />
         {tagline ? <Text style={styles.tagline}>{tagline.toUpperCase()}</Text> : null}
         {children}
       </View>
+      {fill ? (
+        <View style={styles.sceneLabel}>
+          <Text style={styles.sceneLabelText}>A clearer view of your business</Text>
+          <Text style={styles.sceneLabelValue}>↗ Grow smarter</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -112,44 +123,61 @@ export function BrandSplash({ children }: { children?: ReactNode }) {
   );
 }
 
-// The picture sits behind the words, with a dark wash on the words' side that keeps them readable
-// whatever the card's height crops the picture to.
-export function HeroCard({ kicker, title, body, action, scene = 'overview' }: { kicker: string; title: string; body: string; action?: ReactNode; scene?: SceneName }) {
+// A white card with the words on one side and the photo on the other, as in the updated design. On a
+// wide window the photo sits on the right; on a phone it sits under the words.
+export function HeroCard({ kicker, title, body, action, scene = 'owners' }: { kicker: string; title: string; body: string; action?: ReactNode; scene?: SceneName }) {
+  const wide = useWideLayout();
   return (
     <Animated.View entering={entrance()} style={styles.heroShadow}>
-      <View style={styles.hero}>
-        <Image source={SCENES[scene]} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="right bottom" transition={motion.base} />
-        <LinearGradient colors={['rgba(21, 60, 70, 0.96)', 'rgba(21, 60, 70, 0.8)', 'rgba(21, 60, 70, 0)']} locations={[0, 0.6, 0.95]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
-        <View style={styles.heroContent}>
-          <Kicker inverse>{kicker}</Kicker>
-          <Text variant="headlineSmall" style={styles.heroTitle} accessibilityRole="header">
+      <View style={[styles.hero, wide && styles.heroWide]}>
+        <View style={[styles.heroContent, wide && styles.heroContentWide]}>
+          <Kicker>{`✦ ${kicker}`}</Kicker>
+          <Text style={[styles.heroTitle, wide && styles.heroTitleWide]} accessibilityRole="header">
             {title}
           </Text>
-          <Text variant="bodyMedium" style={styles.heroBody}>
-            {body}
-          </Text>
+          <Text style={styles.heroBody}>{body}</Text>
           {action ? <View style={styles.heroAction}>{action}</View> : null}
+        </View>
+        <View style={[styles.heroPicture, wide && styles.heroPictureWide]}>
+          <Image source={SCENES[scene]} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="center" transition={motion.base} />
+          <View style={styles.heroLabel}>
+            <Text style={styles.heroLabelText}>One workspace. More clarity.</Text>
+            <Text style={styles.heroLabelValue}>↗ Grow smarter</Text>
+          </View>
         </View>
       </View>
     </Animated.View>
   );
 }
 
+// The app's header on a phone: white with a fine line under it, matching the light sidebar on the web.
 export function HeaderBackdrop() {
-  return <LinearGradient colors={gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />;
+  return <View style={[StyleSheet.absoluteFill, styles.headerBackdrop]} />;
 }
 
 const styles = StyleSheet.create({
   tile: { alignItems: 'center', justifyContent: 'center' },
-  heroShadow: { borderRadius: radius.xl, ...shadows.raised },
-  hero: { borderRadius: radius.xl, overflow: 'hidden', backgroundColor: palette.deepTeal },
-  heroContent: { padding: spacing.xl, gap: spacing.sm, maxWidth: '84%' },
-  heroTitle: { color: supporting.white },
-  heroBody: { color: palette.softMint },
-  heroAction: { marginTop: spacing.sm, alignItems: 'flex-start' },
+  heroShadow: { borderRadius: 21, ...shadows.raised },
+  hero: { borderRadius: 21, overflow: 'hidden', backgroundColor: supporting.white, borderWidth: 1, borderColor: supporting.line },
+  heroWide: { flexDirection: 'row', minHeight: 290 },
+  heroContent: { padding: 23, gap: spacing.md },
+  heroContentWide: { width: '53%', paddingVertical: 35, paddingHorizontal: 36, justifyContent: 'center' },
+  heroTitle: { color: '#142F35', fontSize: 27, lineHeight: 32, fontWeight: '800', letterSpacing: -1.2 },
+  heroTitleWide: { fontSize: 36, lineHeight: 41, letterSpacing: -1.6 },
+  heroBody: { color: supporting.mutedText, fontSize: 13, lineHeight: 23 },
+  heroAction: { marginTop: spacing.xs, alignItems: 'flex-start' },
+  heroPicture: { height: 230, backgroundColor: palette.softMint },
+  heroPictureWide: { width: '47%', height: 'auto' },
+  heroLabel: { position: 'absolute', left: 13, bottom: 13, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 11, backgroundColor: supporting.white, borderWidth: 1, borderColor: supporting.line, boxShadow: '0px 10px 30px rgba(21, 60, 70, 0.12)' },
+  heroLabelText: { fontSize: 10, color: supporting.mutedText },
+  heroLabelValue: { fontSize: 16, fontWeight: '800', color: palette.teal, marginTop: 4 },
+  headerBackdrop: { backgroundColor: supporting.white, borderBottomWidth: 1, borderBottomColor: supporting.line },
   scene: { width: '100%', overflow: 'hidden', backgroundColor: palette.deepTeal },
   sceneFill: { flex: 1 },
   sceneContent: { paddingHorizontal: spacing.xl, gap: spacing.xs },
+  sceneLabel: { position: 'absolute', left: 23, bottom: 23, paddingVertical: 15, paddingHorizontal: 19, borderRadius: 13, backgroundColor: supporting.white, boxShadow: '0px 12px 35px rgba(21, 60, 70, 0.14)' },
+  sceneLabelText: { fontSize: 11, color: supporting.mutedText },
+  sceneLabelValue: { fontSize: 23, fontWeight: '800', color: palette.teal, marginTop: 4 },
   tagline: { fontSize: 11, fontWeight: '600', letterSpacing: 1.2, color: palette.softMint },
   splash: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.lg },
 });
