@@ -20,4 +20,5 @@ export { useAccountAccess } from './presentation/viewmodels/useAccountAccess';
 export { EntryChoiceProvider, useEntryChoice } from './presentation/viewmodels/useEntryChoice';
 export { SessionProvider, useCurrentUser, useSession } from './presentation/viewmodels/useSession';
 export { ForgotPasswordScreen, SignInScreen, SignUpScreen, VerifyEmailScreen } from './presentation/views/authScreens';
+export { LandingScreen } from './presentation/views/landingScreen';
 export { AccountBlockedScreen, AccountSecurityScreen, ProfileScreen } from './presentation/views/profileScreens';
