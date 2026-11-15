@@ -68,6 +68,8 @@ Sign-in asks for Business or Verida team, and registration asks for My business,
 - A module imports another only through its `index.ts`, never its internal files.
 - Allowed dependencies are declared in `MODULE_DEPENDENCIES` in `eslint.config.js`. Every module may depend on `business` for the active workspace, and `business` depends on `account`. Nothing else crosses over.
 - Where two modules must cooperate, they meet in a layer above them. The assistant needs KPI figures, so it declares a `BusinessFactsProvider` port, and `src/composition/createAppDependencies.ts` connects it to analytics. The assistant has no dependency on analytics.
+- Records read receipts through a `ReceiptReader` port. The composition root connects it to the assistant's AI service, as it does for `BusinessFactsProvider`.
+- Receipts, product photos and logos go through one `BusinessFileStore` (`src/core/files`, implemented in `core/supabase`), which each module that attaches files receives through its dependencies. Files live under `<business id>/<folder>/` in the private `business-files` bucket, and storage rules apply the business permission of the data each folder belongs to.
 - Writes refresh other modules without coupling them: all business data is cached under `businessScope(id)`, so invalidating that key refreshes every dependent screen (FR-E08).
 
 ## Database

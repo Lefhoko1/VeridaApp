@@ -4,7 +4,7 @@ import { Divider, List, Searchbar, Text } from 'react-native-paper';
 
 import { formatDate, formatQuantity } from '@/core/format/format';
 import { DATE_RANGE_OPTIONS } from '@/core/time/dateRange';
-import { Button, CsvImportScreen, DataTable, DateField, EmptyState, ErrorView, FieldGrid, FormField, LoadingView, Notice, Panel, Row, Screen, SelectField, StatusPill, palette, spacing, supporting, useWideLayout } from '@/design-system';
+import { AttachmentsField, Button, CsvImportScreen, DataTable, DateField, EmptyState, ErrorView, FieldGrid, FormField, LoadingView, Notice, Panel, Row, Screen, SelectField, StatusPill, palette, spacing, supporting, useWideLayout } from '@/design-system';
 
 import { useActivityImportViewModel } from '../viewmodels/useActivityImportViewModel';
 import { useActivityFormViewModel, useActivityListViewModel, type ActivityPrefill } from '../viewmodels/useActivityViewModels';
@@ -146,6 +146,22 @@ export function ActivityFormScreen({ activityId, prefill, onDone }: { activityId
           </Row>
         </FieldGrid>
         <FormField label="Notes (optional)" value={values.notes} onChangeText={(v) => setValue('notes', v)} error={errors.notes} multiline disabled={vm.isVoided} />
+      </Panel>
+      <Panel>
+        <AttachmentsField
+          label="Receipts or evidence (optional)"
+          hint="Photos or PDFs that back up this record, up to 10. Only people in this business can see them."
+          files={vm.receipt.files}
+          uploading={vm.receipt.uploading}
+          error={vm.receipt.error}
+          allowPdf
+          full={vm.receipt.full}
+          disabled={!vm.canSave}
+          onTakePhoto={vm.receipt.takePhoto}
+          onChoosePhoto={vm.receipt.choosePhoto}
+          onChooseDocument={vm.receipt.chooseDocument}
+          onRemove={vm.receipt.remove}
+        />
       </Panel>
       {vm.canSave ? (
         <Button mode="contained" onPress={vm.submit} loading={vm.saving} disabled={vm.saving}>

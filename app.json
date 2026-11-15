@@ -12,7 +12,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#153C46",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -33,11 +33,19 @@
       "expo-sharing",
       "expo-image",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Verida uses your photos so you can attach receipts, product pictures and your business logo.",
+          "cameraPermission": "Verida uses the camera so you can photograph receipts and products.",
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
-          "imageWidth": 160,
-          "backgroundColor": "#153C46"
+          "imageWidth": 200,
+          "backgroundColor": "#FFFFFF"
         }
       ]
     ],

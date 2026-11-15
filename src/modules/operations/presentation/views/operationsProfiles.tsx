@@ -1,5 +1,5 @@
 import { formatDate, formatQuantity } from '@/core/format/format';
-import { Button, ConfirmDialog, DetailPanel, ErrorView, LoadingView, Notice, ProfileHeader, Screen, supporting } from '@/design-system';
+import { AttachmentGallery, Button, ConfirmDialog, DetailPanel, ErrorView, LoadingView, Notice, Panel, ProfileHeader, Screen, supporting } from '@/design-system';
 
 import { useActivityDetailViewModel } from '../viewmodels/useActivityViewModels';
 import { useFlockDetailViewModel } from '../viewmodels/useFlockViewModels';
@@ -29,6 +29,11 @@ export function ActivityProfileScreen({ activityId, onEdit }: { activityId: stri
           { label: 'Notes', value: record.notes },
         ]}
       />
+      {vm.receipts.length > 0 ? (
+        <Panel>
+          <AttachmentGallery label="Receipts" files={vm.receipts} />
+        </Panel>
+      ) : null}
       {vm.canEdit ? (
         <Button mode="contained" icon="pencil-outline" onPress={onEdit}>
           Edit record

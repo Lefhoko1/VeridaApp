@@ -21,9 +21,9 @@ export function RootNavigator() {
   if (isResolving) {
     return (
       <BrandSplash>
-        <StatusBar style="light" />
+        <StatusBar style="dark" />
         <Breathe>
-          <BrandLogo size={44} inverse />
+          <BrandLogo size={44} />
         </Breathe>
       </BrandSplash>
     );

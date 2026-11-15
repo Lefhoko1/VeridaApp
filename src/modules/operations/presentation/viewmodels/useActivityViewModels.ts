@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { errorMessage } from '@/core/errors/AppError';
+import { isPdf } from '@/core/files/types';
+import { useAttachments } from '@/core/files/useAttachment';
 import { todayIso } from '@/core/format/format';
 import { useForm } from '@/core/forms/useForm';
 import { businessScope } from '@/core/query/queryClient';
@@ -63,8 +65,25 @@ export function useActivityListViewModel() {
 // FR-G18: values suggested by Ask Verida. The user still reviews and saves them (FR-G20).
 export type ActivityPrefill = { activity?: string; quantity?: string; unit?: string; occurredOn?: string };
 
+const NO_LINKS: Record<string, string> = {};
+
+// Short-lived links to show a record's stored receipts.
+function useFileLinks(paths: string[] | undefined) {
+  const { files } = useOperationsDependencies();
+  const { business } = useActiveBusiness();
+  const wanted = paths ?? [];
+  const links = useQuery({
+    queryKey: [...businessScope(business.id), 'file-links', wanted],
+    queryFn: () => files.linksFor(wanted),
+    enabled: wanted.length > 0,
+    staleTime: 30 * 60 * 1000,
+  });
+  const map = links.data ?? NO_LINKS;
+  return { links: map, files: wanted.flatMap((path) => (map[path] ? [{ url: map[path], isPdf: isPdf(path) }] : [])) };
+}
+
 export function useActivityFormViewModel({ activityId, prefill, onDone }: { activityId?: string; prefill?: ActivityPrefill; onDone: () => void }) {
-  const { activities, flocks } = useOperationsDependencies();
+  const { activities, flocks, files } = useOperationsDependencies();
   const { business, can } = useActiveBusiness();
   const feedback = useFeedback();
   const queryClient = useQueryClient();
@@ -106,6 +125,24 @@ export function useActivityFormViewModel({ activityId, prefill, onDone }: { acti
     });
   }, [existing.data, reset]);
 
+  const attachments = useAttachments({ store: files, businessId: business.id, folder: 'receipts', allowPdf: true });
+  const existingPaths = existing.data?.receiptPaths;
+  const existingLinks = useFileLinks(existingPaths);
+  const { load } = attachments;
+  // Load a record's receipts once, so a later refresh never drops ones the user just added.
+  const loadedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!existingPaths) return;
+    const key = existingPaths.join('|');
+    if (loadedFor.current === key) return;
+    loadedFor.current = key;
+    load(existingPaths, NO_LINKS);
+  }, [existingPaths, load]);
+  const receipt = {
+    ...attachments,
+    files: attachments.files.map((file) => (file.previewUri || file.isPdf ? file : { ...file, previewUri: existingLinks.links[file.path] ?? null })),
+  };
+
   const availableTypes = types.data;
   const suggestedActivity = prefill?.activity;
   const suggestedUnit = prefill?.unit;
@@ -128,7 +165,10 @@ export function useActivityFormViewModel({ activityId, prefill, onDone }: { acti
 
   const save = useMutation({
     mutationFn: (input: ActivityInput) => (activityId ? activities.update(activityId, input) : activities.create(business.id, input)),
-    onSuccess: () => finish(activityId ? 'Record updated.' : 'Record saved.'),
+    onSuccess: () => {
+      attachments.commit();
+      return finish(activityId ? 'Record updated.' : 'Record saved.');
+    },
     ...report,
   });
 
@@ -155,12 +195,13 @@ export function useActivityFormViewModel({ activityId, prefill, onDone }: { acti
     ],
     canSave: !isVoided && can(activityId ? 'records.edit' : 'records.create'),
     saving: save.isPending,
+    receipt,
     submit() {
       const input = form.validate();
       if (!input) return;
       const problem = selectedType ? activityRuleProblem(selectedType, input) : null;
       if (problem) feedback.error(problem);
-      else save.mutate(input);
+      else save.mutate({ ...input, receiptPaths: receipt.paths });
     },
   };
 }
@@ -192,11 +233,13 @@ export function useActivityDetailViewModel(activityId: string) {
   });
 
   const isVoided = detail.data?.status === 'voided';
+  const receipts = useFileLinks(detail.data?.receiptPaths).files;
 
   return {
     loading: detail.isPending,
     error: detail.error ? errorMessage(detail.error) : null,
     record: detail.data ?? null,
+    receipts,
     isVoided,
     flockName: flockList.data?.find((flock) => flock.id === detail.data?.flockId)?.name ?? null,
     canEdit: !isVoided && can('records.edit'),

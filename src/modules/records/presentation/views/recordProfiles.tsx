@@ -1,4 +1,4 @@
-import { Button, ConfirmDialog, DetailPanel, ErrorView, LoadingView, Notice, ProfileHeader, Row, Screen, spacing, supporting } from '@/design-system';
+import { AttachmentGallery, AttachmentPreview, Button, ConfirmDialog, DetailPanel, ErrorView, LoadingView, Notice, Panel, ProfileHeader, Row, Screen, spacing, supporting } from '@/design-system';
 import { formatDate, formatQuantity } from '@/core/format/format';
 
 import { CERTAINTY_OPTIONS, PRODUCT_KIND_OPTIONS } from '../../domain/validation';
@@ -39,6 +39,11 @@ export function SaleProfileScreen({ saleId, onEdit }: { saleId: string; onEdit: 
           { label: 'Notes', value: sale.notes },
         ]}
       />
+      {vm.receipts.length > 0 ? (
+        <Panel>
+          <AttachmentGallery label="Receipts" files={vm.receipts} />
+        </Panel>
+      ) : null}
       {vm.canEdit ? (
         <Button mode="contained" icon="pencil-outline" onPress={onEdit}>
           Edit sale
@@ -92,6 +97,11 @@ export function ExpenseProfileScreen({ expenseId, onEdit }: { expenseId: string;
           { label: 'Notes', value: expense.notes },
         ]}
       />
+      {vm.receipts.length > 0 ? (
+        <Panel>
+          <AttachmentGallery label="Receipts" files={vm.receipts} />
+        </Panel>
+      ) : null}
       {vm.canEdit ? (
         <Button mode="contained" icon="pencil-outline" onPress={onEdit}>
           Edit expense
@@ -139,6 +149,11 @@ export function ProductProfileScreen({ productId, onEdit, onRemoved }: { product
           { label: 'Description', value: product.description },
         ]}
       />
+      {vm.image.url ? (
+        <Panel>
+          <AttachmentPreview label="Photo" url={vm.image.url} isPdf={false} shape="square" />
+        </Panel>
+      ) : null}
       {vm.canManage ? (
         <>
           <Button mode="contained" icon="pencil-outline" onPress={onEdit}>

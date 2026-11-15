@@ -14,15 +14,16 @@ export const supporting = {
   ink: '#182D31',
   mutedText: '#5F7477',
   line: '#E3EBE6',
-  eyebrowWash: '#E9F5EF',
+  // Labels and highlights sit on soft mint, and pages on warm ivory, so the brand palette carries
+  // the look. These names say where each colour is used.
+  eyebrowWash: palette.softMint,
   eyebrowText: '#17675C',
-  // The signed-in app's light surfaces (Verida_All_Pages_With_Hero_Design).
-  pageWash: '#F7FAF8',
+  pageWash: palette.warmIvory,
   navText: '#506F70',
-  navHover: '#EFF7F3',
-  navActive: '#E4F3EB',
-  bizWash: '#F4F9F6',
-  bizBorder: '#E0EBE5',
+  navHover: '#F0F6F3',
+  navActive: palette.softMint,
+  bizWash: '#F0F6F3',
+  bizBorder: '#B9D9D1',
   gridLine: '#E5EEE8',
   axisLine: '#CDDFD4',
   mintBorder: '#B9D9D1',

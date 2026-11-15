@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SegmentedButtons, Text } from 'react-native-paper';
 
 import { Button, FormField, Notice, PasswordField, Screen, Stack, supporting, SceneHeader, Reveal, palette } from '@/design-system';
@@ -9,21 +9,27 @@ import { useForgotPasswordViewModel, useSignInViewModel, useSignUpViewModel, use
 
 const PASSWORD_HINT = 'At least 8 characters, with upper and lower case letters and a number.';
 
-const SIGN_IN_AREAS = [
-  { value: 'business', label: 'Business', accessibilityLabel: 'Sign in as a business user' },
-  { value: 'team', label: 'Verida team', accessibilityLabel: 'Sign in as Verida team' },
-];
-
 const SIGN_IN_SUBTITLE: Record<EntryArea, string> = {
   business: 'Sign in to your business workspace. Your role in the business is set by its owner.',
   team: 'Sign in to the Verida team tools. Your access is set by a Verida administrator.',
 };
 
+// Verida is made for businesses, so the Verida team signs in and registers through a small link.
 const SIGN_UP_INTENTS = [
   { value: 'own_business', label: 'My business', accessibilityLabel: 'I run my own business' },
   { value: 'join_business', label: 'I was invited', accessibilityLabel: 'I was invited to join a business' },
-  { value: 'verida_team', label: 'Verida team', accessibilityLabel: 'I work for Verida' },
 ];
+
+// The small link at the foot of sign-in and registration, for Verida staff.
+function TeamLink({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <View style={styles.footer}>
+      <Button mode="text" compact icon="shield-account-outline" onPress={onPress} labelStyle={styles.footerLabel} textColor={supporting.mutedText}>
+        {label}
+      </Button>
+    </View>
+  );
+}
 
 const SIGN_UP_HELP: Record<EntryChoice, string> = {
   own_business: 'You will set up your business after you register, and become its owner.',
@@ -62,8 +68,7 @@ export function SignInScreen({
   const vm = useSignInViewModel(onUnverified);
   const { values, errors, setValue } = vm.form;
   return (
-    <AuthLayout title="Welcome back" subtitle={SIGN_IN_SUBTITLE[vm.area]} error={vm.error}>
-      <SegmentedButtons value={vm.area} onValueChange={(value) => vm.setArea(value as EntryArea)} buttons={SIGN_IN_AREAS} />
+    <AuthLayout title={vm.area === 'team' ? 'Verida team sign in' : 'Welcome back'} subtitle={SIGN_IN_SUBTITLE[vm.area]} error={vm.error}>
       <FormField label="Email address" value={values.email} onChangeText={(v) => setValue('email', v)} error={errors.email} autoCapitalize="none" autoComplete="email" keyboardType="email-address" />
       <PasswordField label="Password" value={values.password} onChangeText={(v) => setValue('password', v)} error={errors.password} autoComplete="current-password" onSubmitEditing={vm.submit} />
       <Button mode="contained" onPress={vm.submit} loading={vm.busy} disabled={vm.busy}>
@@ -73,6 +78,11 @@ export function SignInScreen({
       <Button mode="outlined" onPress={onSignUp}>
         Create an account
       </Button>
+      {vm.area === 'team' ? (
+        <TeamLink label="Sign in to a business instead" onPress={() => vm.setArea('business')} />
+      ) : (
+        <TeamLink label="Verida team sign in" onPress={() => vm.setArea('team')} />
+      )}
     </AuthLayout>
   );
 }
@@ -81,8 +91,8 @@ export function SignUpScreen({ onRegistered, onSignIn }: { onRegistered: (email:
   const vm = useSignUpViewModel(onRegistered);
   const { values, errors, setValue } = vm.form;
   return (
-    <AuthLayout title="Create your account" subtitle="How will you use Verida?" error={vm.error}>
-      <SegmentedButtons value={vm.intent} onValueChange={(value) => vm.setIntent(value as EntryChoice)} buttons={SIGN_UP_INTENTS} />
+    <AuthLayout title={vm.intent === 'verida_team' ? 'Verida team registration' : 'Create your account'} subtitle={vm.intent === 'verida_team' ? 'For people who work at Verida.' : 'How will you use Verida?'} error={vm.error}>
+      {vm.intent === 'verida_team' ? null : <SegmentedButtons value={vm.intent} onValueChange={(value) => vm.setIntent(value as EntryChoice)} buttons={SIGN_UP_INTENTS} />}
       <Notice tone="info">{SIGN_UP_HELP[vm.intent]}</Notice>
       <FormField label="Your name" value={values.fullName} onChangeText={(v) => setValue('fullName', v)} error={errors.fullName} autoComplete="name" />
       <FormField label="Email address" value={values.email} onChangeText={(v) => setValue('email', v)} error={errors.email} autoCapitalize="none" autoComplete="email" keyboardType="email-address" />
@@ -91,6 +101,11 @@ export function SignUpScreen({ onRegistered, onSignIn }: { onRegistered: (email:
         Create account
       </Button>
       <Button onPress={onSignIn}>I already have an account</Button>
+      {vm.intent === 'verida_team' ? (
+        <TeamLink label="Register a business instead" onPress={() => vm.setIntent('own_business')} />
+      ) : (
+        <TeamLink label="Verida team registration" onPress={() => vm.setIntent('verida_team')} />
+      )}
     </AuthLayout>
   );
 }
@@ -142,4 +157,6 @@ export function ForgotPasswordScreen({ onBack }: { onBack: () => void }) {
 const styles = StyleSheet.create({
   title: { color: palette.deepTeal },
   subtitle: { color: supporting.mutedText },
+  footer: { alignItems: 'center', marginTop: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: supporting.line },
+  footerLabel: { fontSize: 12, fontWeight: '600' },
 });

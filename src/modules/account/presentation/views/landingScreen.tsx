@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, useWindowDimensions, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 import { Icon, Text, TouchableRipple } from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandLogo, Button, Kicker, palette, supporting } from '@/design-system';
 
@@ -11,7 +12,7 @@ import { BrandLogo, Button, Kicker, palette, supporting } from '@/design-system'
 // leads to registration and sign-in; it has no data of its own.
 
 const IMAGES = {
-  hero: require('../../../../../assets/scenes/business-owners.png'),
+  hero: require('../../../../../assets/scenes/business-owners.jpg'),
   retail: require('../../../../../assets/landing/industry-retail.svg'),
   salon: require('../../../../../assets/landing/industry-salon.svg'),
   services: require('../../../../../assets/landing/industry-services.svg'),
@@ -67,6 +68,7 @@ function useSize(): Size {
 
 export function LandingScreen({ onGetStarted, onSignIn }: { onGetStarted: () => void; onSignIn: () => void }) {
   const size = useSize();
+  const { top } = useSafeAreaInsets();
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
   // Where each section starts, so the navigation links can scroll to it.
   const [offsets, setOffsets] = useState<Partial<Record<SectionKey, number>>>({});
@@ -82,7 +84,7 @@ export function LandingScreen({ onGetStarted, onSignIn }: { onGetStarted: () => 
   return (
     <View style={styles.page}>
       <StatusBar style="dark" />
-      <View style={styles.top} role="banner">
+      <View style={[styles.top, { paddingTop: top }]} role="banner">
         <Container style={styles.topInner}>
           <TouchableRipple onPress={() => goTo('home')} accessibilityRole="link" accessibilityLabel="Verida, back to top">
             <BrandLogo size={phone ? 26 : 31} />

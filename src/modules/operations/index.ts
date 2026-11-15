@@ -1,13 +1,15 @@
+import type { BusinessFileStore } from '@/core/files/types';
 import type { SupabaseClient } from '@/core/supabase/client';
 
 import { SupabaseActivityRepository } from './data/SupabaseActivityRepository';
 import { SupabaseFlockRepository } from './data/SupabaseFlockRepository';
 import type { OperationsDependencies } from './presentation/di';
 
-export function createOperationsDependencies(client: SupabaseClient): OperationsDependencies {
+export function createOperationsDependencies(client: SupabaseClient, files: BusinessFileStore): OperationsDependencies {
   return {
     activities: new SupabaseActivityRepository(client),
     flocks: new SupabaseFlockRepository(client),
+    files,
   };
 }
 

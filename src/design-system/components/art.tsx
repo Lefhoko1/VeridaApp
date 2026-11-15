@@ -8,7 +8,7 @@ import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, w
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { palette, supporting } from '../theme/palette';
-import { gradients, shadows, spacing } from '../theme/theme';
+import { shadows, spacing } from '../theme/theme';
 import { BrandLogo } from './brand';
 import { Kicker } from './layout';
 import { entrance, motion } from './motion';
@@ -37,7 +37,7 @@ export type IllustrationName = keyof typeof ILLUSTRATIONS;
 
 export const SCENES = {
   // The updated design's hero photo: business owners across industries.
-  owners: require('../../../assets/scenes/business-owners.png'),
+  owners: require('../../../assets/scenes/business-owners.jpg'),
   savanna: require('../../../assets/scenes/savanna.webp'),
   overview: require('../../../assets/scenes/hero-overview.webp'),
   learn: require('../../../assets/scenes/hero-learn.webp'),
@@ -114,12 +114,12 @@ export function SceneHeader({ scene = 'owners', tagline, children }: { scene?: S
   );
 }
 
-// The app's first moment, matching the native splash screen so that the two run together.
+// The app's first moment, matching the native splash screen (the logo on white) so the two run together.
 export function BrandSplash({ children }: { children?: ReactNode }) {
   return (
-    <LinearGradient colors={gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.splash} accessible accessibilityRole="progressbar" accessibilityLabel="Loading your workspace">
+    <View style={[styles.splash, styles.splashWhite]} accessible accessibilityRole="progressbar" accessibilityLabel="Loading your workspace">
       {children}
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -180,4 +180,5 @@ const styles = StyleSheet.create({
   sceneLabelValue: { fontSize: 23, fontWeight: '800', color: palette.teal, marginTop: 4 },
   tagline: { fontSize: 11, fontWeight: '600', letterSpacing: 1.2, color: palette.softMint },
   splash: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.lg },
+  splashWhite: { backgroundColor: supporting.white },
 });

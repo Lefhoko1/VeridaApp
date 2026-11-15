@@ -41,6 +41,7 @@ Administrative requirements are complete, but nobody can use them until a first 
 | FR-F16, F17, F18, F29 AI lesson drafts and regeneration | An Anthropic API key set as a Supabase secret | Drafts are adapted from approved content matched to the learner's industry and chosen topics. Regenerating moves to other approved content |
 | FR-G07, G11, G14 AI understanding of questions | The same key | Keyword rules, and the app says so beside the answer |
 | FR-G16 to G20 Capture assistance from free text | The same key | Explains the fields and opens the form, but can't pre-fill it from what the user typed |
+| Reading receipts into a sale or expense form | The same key, and deploying the `read-receipt` function | Receipts can be attached and viewed. "Fill in from receipt" says the AI is not switched on, and the user fills in the form |
 | FR-H09 Email delivery | A Resend API key set as a Supabase secret. The dispatch job has been scheduled since 2026-11-03 | In-app delivery works and is recorded. Emails wait in the queue |
 | FR-H04 Learning reminders | A first run to confirm. The daily job has been scheduled since 2026-11-03, and had not yet run when checked on 2026-11-04 | The function that sends them is built and tested |
 
@@ -51,6 +52,8 @@ Emails are sent from `no-reply@vinabbie.com`, verified in Resend on 2026-11-13. 
 | Requirement | Note |
 | --- | --- |
 | Choosing an area at sign-in and registration | Added at the project owner's request. It chooses which area opens first and grants nothing, so Verida team access still needs a role from an administrator |
+| Receipts, product photos and logos | Added at the project owner's request. Sales, expenses and activity records can carry up to ten receipts (photos or PDFs), products a photo, and the business a logo. A file uploaded but never saved is deleted when the form closes, and one removed from a saved record is deleted when the change is saved. Files sit in a private storage bucket under the business, and each folder follows the permission of its data: receipts need Capture or Edit records, photos Manage products, the logo Manage business, and seeing any of them View records. Staff erasing a business remove its files first. The AI reads a receipt into the form for the user to check and save (FR-G20); it never saves a record |
+| Landing page and sign-in | Added at the project owner's request. Everyone who is not signed in, in the app and on the website, first sees a page about Verida. Sign-in and registration default to a business; the Verida team uses a small link at the foot of each |
 | Viewing before editing | Added at the project owner's request. Lists open a read-only profile with an Edit button, for sales, expenses, activity, products, flocks and learning content. Lesson review still opens its editable text, because correcting it is the task |
 | FR-B02, B03 Business details | Extended at the project owner's request. Business type, reasons and record keeping accept several answers, All of the above and Other. Country is searchable across 251 countries, and it suggests the currency, which is required and can be changed. Lessons and the assistant use only the main business type |
 | FR-C04, C05 Categories | A record keeps one category, so that no figure is counted twice. Other adds a new category from the dropdown, and filters accept several |

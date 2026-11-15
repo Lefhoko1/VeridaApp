@@ -43,6 +43,7 @@ const workspaceSchema = z
     my_role: z.enum(['owner', 'manager', 'staff', 'viewer']),
     additional_industries: z.array(z.string()).default([]),
     other_type: z.string().nullable().default(null),
+    logo_path: z.string().nullable().default(null),
   })
   .transform(
     (row): Workspace => ({
@@ -60,6 +61,7 @@ const workspaceSchema = z
       otherType: row.other_type,
       status: row.status,
       myRole: row.my_role,
+      logoPath: row.logo_path,
     }),
   );
 
@@ -155,6 +157,10 @@ export class SupabaseBusinessRepository implements BusinessRepository {
         })
         .eq('id', businessId),
     );
+  }
+
+  async setLogo(businessId: string, logoPath: string | null): Promise<void> {
+    assertSuccess(await this.db.from('businesses').update({ logo_path: logoPath }).eq('id', businessId));
   }
 
   async setStatus(businessId: string, status: Exclude<BusinessStatus, 'suspended'>): Promise<void> {

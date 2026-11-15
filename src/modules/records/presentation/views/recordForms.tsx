@@ -1,15 +1,39 @@
 import { StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 
-import { Button, DateField, ErrorView, FieldGrid, FormField, LoadingView, Notice, Panel, Row, Screen, SelectField, palette } from '@/design-system';
+import { AttachmentField, AttachmentsField, Button, DateField, ErrorView, FieldGrid, FormField, LoadingView, Notice, Panel, Row, Screen, SelectField, palette } from '@/design-system';
 
 import { CERTAINTY_OPTIONS, PRODUCT_KIND_OPTIONS } from '../../domain/validation';
 import { useExpenseFormViewModel, type ExpensePrefill } from '../viewmodels/useExpenseViewModels';
 import { useProductFormViewModel } from '../viewmodels/useProductViewModels';
+import type { ReceiptsViewModel } from '../viewmodels/useReceipt';
 import { useSaleFormViewModel, type SalePrefill } from '../viewmodels/useSalesViewModels';
 
 function VoidedNotice({ reason }: { reason: string | null }) {
   return <Notice title="This record has been voided">{`It no longer counts in your reports. Reason: ${reason ?? 'not given'}.`}</Notice>;
+}
+
+// Evidence for the record. The AI service can read any receipt into the form for checking.
+function ReceiptsField({ receipts, disabled }: { receipts: ReceiptsViewModel; disabled: boolean }) {
+  return (
+    <Panel>
+      <AttachmentsField
+        label="Receipts or evidence (optional)"
+        hint="Photos or PDFs of receipts, invoices or slips, up to 10. Only people in this business can see them."
+        files={receipts.files}
+        uploading={receipts.uploading}
+        error={receipts.error}
+        allowPdf={receipts.allowPdf}
+        full={receipts.full}
+        disabled={disabled}
+        onTakePhoto={receipts.takePhoto}
+        onChoosePhoto={receipts.choosePhoto}
+        onChooseDocument={receipts.chooseDocument}
+        onRemove={receipts.remove}
+        fileAction={{ label: 'Fill in', busy: receipts.reading, onPress: receipts.readReceipt }}
+      />
+    </Panel>
+  );
 }
 
 export function SaleFormScreen({ saleId, prefill, onDone }: { saleId?: string; prefill?: SalePrefill; onDone: () => void }) {
@@ -38,6 +62,7 @@ export function SaleFormScreen({ saleId, prefill, onDone }: { saleId?: string; p
         </Text>
         <FormField label="Notes (optional)" value={values.notes} onChangeText={(v) => setValue('notes', v)} error={errors.notes} multiline placeholder="Context that will help you understand this later" disabled={vm.isVoided} />
       </Panel>
+      <ReceiptsField receipts={vm.receipt} disabled={!vm.canSave} />
       {vm.canSave ? (
         <Button mode="contained" onPress={vm.submit} loading={vm.saving} disabled={vm.saving}>
           {vm.isEditing ? 'Save changes' : 'Save sale'}
@@ -70,6 +95,7 @@ export function ExpenseFormScreen({ expenseId, prefill, onDone }: { expenseId?: 
         </FieldGrid>
         <FormField label="Notes (optional)" value={values.notes} onChangeText={(v) => setValue('notes', v)} error={errors.notes} multiline disabled={vm.isVoided} />
       </Panel>
+      <ReceiptsField receipts={vm.receipt} disabled={!vm.canSave} />
       {vm.canSave ? (
         <Button mode="contained" onPress={vm.submit} loading={vm.saving} disabled={vm.saving}>
           {vm.isEditing ? 'Save changes' : 'Save expense'}
@@ -99,6 +125,22 @@ export function ProductFormScreen({ productId, onDone }: { productId?: string; o
           <FormField style={styles.grow} label="Unit" value={values.unit} onChangeText={(v) => setValue('unit', v)} error={errors.unit} placeholder="e.g. tray" disabled={readOnly} />
           <FormField style={styles.grow} label="Selling price" value={values.sellingPrice} onChangeText={(v) => setValue('sellingPrice', v)} error={errors.sellingPrice} keyboardType="decimal-pad" disabled={readOnly} />
         </Row>
+      </Panel>
+      <Panel>
+        <AttachmentField
+          label="Photo (optional)"
+          hint="A picture of the product or service, or its logo. It shows in your catalogue."
+          shape="square"
+          hasFile={Boolean(vm.image.path)}
+          previewUri={vm.image.previewUri}
+          isPdf={false}
+          uploading={vm.image.uploading}
+          error={vm.image.error}
+          disabled={readOnly}
+          onTakePhoto={vm.image.takePhoto}
+          onChoosePhoto={vm.image.choosePhoto}
+          onRemove={vm.image.remove}
+        />
       </Panel>
       {vm.canManage ? (
         <Button mode="contained" onPress={vm.submit} disabled={vm.busy} loading={vm.busy}>

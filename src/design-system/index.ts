@@ -1,4 +1,5 @@
 export { BrandSplash, HeaderBackdrop, HeroCard, IconTile, Illustration, SceneHeader, type IllustrationName, type SceneName, type TileTone } from './components/art';
+export { AttachmentField, AttachmentGallery, AttachmentPreview, AttachmentsField, Thumbnail } from './components/attachments';
 export { BrandLogo } from './components/brand';
 export { Button } from './components/button';
 export { CsvImportScreen } from './components/csvImport';

@@ -18,6 +18,7 @@ export interface BusinessRepository {
   listPermissions(businessId: string): Promise<Permission[]>;
   register(details: BusinessDetails): Promise<string>;
   update(businessId: string, details: BusinessDetails): Promise<void>;
+  setLogo(businessId: string, logoPath: string | null): Promise<void>;
   setStatus(businessId: string, status: Exclude<BusinessStatus, 'suspended'>): Promise<void>;
   changeHistory(businessId: string): Promise<ChangeEntry[]>;
 }

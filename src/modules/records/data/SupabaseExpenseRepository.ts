@@ -7,7 +7,7 @@ import type { Expense, ExpenseInput, RecordFilter } from '../domain/models';
 import type { ExpenseRepository } from '../domain/repositories';
 import { escapeForSearch, LIST_LIMIT } from './query';
 
-const COLUMNS = 'id, occurred_on, category, description, amount, quantity, unit, certainty, notes, status, void_reason';
+const COLUMNS = 'id, occurred_on, category, description, amount, quantity, unit, certainty, notes, status, void_reason, receipt_paths';
 
 const rowSchema = z
   .object({
@@ -22,6 +22,7 @@ const rowSchema = z
     notes: z.string().nullable(),
     status: z.enum(['recorded', 'voided']),
     void_reason: z.string().nullable(),
+    receipt_paths: z.array(z.string()).default([]),
   })
   .transform(
     (row): Expense => ({
@@ -36,6 +37,7 @@ const rowSchema = z
       notes: row.notes,
       status: row.status,
       voidReason: row.void_reason,
+      receiptPaths: row.receipt_paths,
     }),
   );
 
@@ -48,6 +50,8 @@ const toRow = (input: ExpenseInput) => ({
   unit: input.unit,
   certainty: input.certainty,
   notes: input.notes,
+  // Only sent when the form manages a file, so imports and older callers leave it alone.
+  ...(input.receiptPaths !== undefined ? { receipt_paths: input.receiptPaths } : {}),
 });
 
 export class SupabaseExpenseRepository implements ExpenseRepository {

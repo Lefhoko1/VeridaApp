@@ -62,7 +62,7 @@ curl -X POST http://127.0.0.1:54321/__emulator/grant-role -d '{"email":"you@exam
    insert into authz.platform_role_assignments (user_id, role)
    select id, 'administrator' from identity.profiles where email = 'you@example.com';
    ```
-2. **Deploy the functions:** `npx supabase functions deploy ask-verida generate-lesson dispatch-email --use-api --remote`
+2. **Deploy the functions:** `npx supabase functions deploy ask-verida generate-lesson dispatch-email read-receipt --use-api --remote`
 3. **Set the secrets** in your own terminal, so that they never appear anywhere else:
    ```sh
    npx supabase secrets set ANTHROPIC_API_KEY=your-key

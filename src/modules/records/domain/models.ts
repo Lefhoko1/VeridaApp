@@ -15,6 +15,8 @@ export type Sale = {
   notes: string | null;
   status: RecordStatus;
   voidReason: string | null;
+  // Where the receipts or other evidence are stored, if any were attached.
+  receiptPaths: string[];
 };
 
 export type SaleInput = {
@@ -26,6 +28,8 @@ export type SaleInput = {
   unit: string | null;
   unitPrice: number;
   notes: string | null;
+  // Left out by imports, which never carry a receipt.
+  receiptPaths?: string[];
 };
 
 export type Expense = {
@@ -40,6 +44,7 @@ export type Expense = {
   notes: string | null;
   status: RecordStatus;
   voidReason: string | null;
+  receiptPaths: string[];
 };
 
 export type ExpenseInput = {
@@ -51,6 +56,7 @@ export type ExpenseInput = {
   unit: string | null;
   certainty: ExpenseCertainty;
   notes: string | null;
+  receiptPaths?: string[];
 };
 
 export type ProductKind = 'product' | 'service';
@@ -64,6 +70,7 @@ export type Product = {
   unit: string;
   sellingPrice: number;
   isActive: boolean;
+  imagePath: string | null;
 };
 
 export type ProductInput = {
@@ -73,6 +80,7 @@ export type ProductInput = {
   description: string | null;
   unit: string;
   sellingPrice: number;
+  imagePath?: string | null;
 };
 
 export type RecordFilter = {

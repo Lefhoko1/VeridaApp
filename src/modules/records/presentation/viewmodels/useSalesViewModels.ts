@@ -13,6 +13,7 @@ import { useActiveBusiness } from '@/modules/business';
 import { saleTotal, type Sale, type SaleInput } from '../../domain/models';
 import { saleFormSchema } from '../../domain/validation';
 import { useRecordsDependencies } from '../di';
+import { useFileLinks, useReceipts } from './useReceipt';
 import { useRecordFilters } from './useRecordFilters';
 
 const NEW_SALE = {
@@ -95,6 +96,25 @@ export function useSaleFormViewModel({ saleId, prefill, onDone }: { saleId?: str
     if (existing.data) reset(toFormValues(existing.data));
   }, [existing.data, reset]);
 
+  const receipt = useReceipts({
+    kind: 'sale',
+    existingPaths: saleId ? existing.data?.receiptPaths : undefined,
+    categories: categoryOptions.data ?? [],
+    apply(reading) {
+      if (reading.occurredOn) setValue('occurredOn', reading.occurredOn);
+      const item = reading.description ?? reading.vendor;
+      if (item) setValue('itemName', item);
+      const category = categoryOptions.data?.find((name) => name.toLowerCase() === reading.category?.toLowerCase());
+      if (category) setValue('category', category);
+      if (reading.unit) setValue('unit', reading.unit);
+      // A receipt often shows only a total: record it as one item at that price.
+      const quantity = reading.quantity ?? (reading.total !== null ? 1 : null);
+      const unitPrice = reading.unitPrice ?? (reading.total !== null && quantity ? Math.round((reading.total / quantity) * 100) / 100 : null);
+      if (quantity !== null) setValue('quantity', String(quantity));
+      if (unitPrice !== null) setValue('unitPrice', String(unitPrice));
+    },
+  });
+
   // Default a new sale to the industry's first category once the options load.
   const availableCategories = categoryOptions.data;
   const suggestedCategory = prefill?.category;
@@ -118,7 +138,10 @@ export function useSaleFormViewModel({ saleId, prefill, onDone }: { saleId?: str
       // A category typed under "Other" joins the list for next time. The sale is saved either way.
       if (!categoryOptions.data?.includes(input.category)) await categories.add(business.id, 'sale', input.category).catch(() => undefined);
     },
-    onSuccess: () => finish(saleId ? 'Sale updated.' : 'Sale recorded.'),
+    onSuccess: () => {
+      receipt.commit();
+      return finish(saleId ? 'Sale updated.' : 'Sale recorded.');
+    },
     ...report,
   });
 
@@ -151,9 +174,10 @@ export function useSaleFormViewModel({ saleId, prefill, onDone }: { saleId?: str
     totalPreview: formatMoney(Number.isFinite(quantity * unitPrice) ? saleTotal(quantity, unitPrice) : 0, business.currency),
     canSave: !isVoided && can(saleId ? 'records.edit' : 'records.create'),
     saving: save.isPending,
+    receipt,
     submit() {
       const input = form.validate();
-      if (input) save.mutate(input);
+      if (input) save.mutate({ ...input, receiptPaths: receipt.paths });
     },
   };
 }
@@ -181,11 +205,13 @@ export function useSaleDetailViewModel(saleId: string) {
   });
 
   const isVoided = detail.data?.status === 'voided';
+  const receiptLinks = useFileLinks(detail.data?.receiptPaths);
 
   return {
     loading: detail.isPending,
     error: detail.error ? errorMessage(detail.error) : null,
     sale: detail.data ?? null,
+    receipts: receiptLinks.files,
     isVoided,
     money: (amount: number) => formatMoney(amount, business.currency),
     canEdit: !isVoided && can('records.edit'),

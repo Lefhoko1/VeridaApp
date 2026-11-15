@@ -7,7 +7,7 @@ import type { CategoryKind, Product, ProductInput } from '../domain/models';
 import type { CategoryRepository, ProductRepository } from '../domain/repositories';
 import { escapeForSearch, LIST_LIMIT } from './query';
 
-const COLUMNS = 'id, kind, name, category, description, unit, selling_price, is_active';
+const COLUMNS = 'id, kind, name, category, description, unit, selling_price, is_active, image_path';
 
 const rowSchema = z
   .object({
@@ -19,6 +19,7 @@ const rowSchema = z
     unit: z.string(),
     selling_price: numeric,
     is_active: z.boolean(),
+    image_path: z.string().nullable(),
   })
   .transform(
     (row): Product => ({
@@ -30,6 +31,7 @@ const rowSchema = z
       unit: row.unit,
       sellingPrice: row.selling_price,
       isActive: row.is_active,
+      imagePath: row.image_path,
     }),
   );
 
@@ -40,6 +42,8 @@ const toRow = (input: ProductInput) => ({
   description: input.description,
   unit: input.unit,
   selling_price: input.sellingPrice,
+  // Only sent when the form manages a file, so imports and older callers leave it alone.
+  ...(input.imagePath !== undefined ? { image_path: input.imagePath } : {}),
 });
 
 export class SupabaseProductRepository implements ProductRepository {

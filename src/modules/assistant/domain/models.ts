@@ -50,3 +50,15 @@ export type AssistantContext = {
   periodLabel: string;
   facts: BusinessFact[];
 };
+
+// What the AI service read from a receipt. Suggestions only: the user checks and saves the form.
+export type ReceiptReadingResult = {
+  occurredOn: string | null;
+  total: number | null;
+  description: string | null;
+  vendor: string | null;
+  category: string | null;
+  quantity: number | null;
+  unit: string | null;
+  unitPrice: number | null;
+};

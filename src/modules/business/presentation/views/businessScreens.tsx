@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Divider, List, Searchbar, Text } from 'react-native-paper';
 
-import { Button, ConfirmDialog, EmptyState, ErrorView, FormField, LabelValue, LoadingView, Panel, PermissionChecklist, Row, Screen, SectionHeader, SelectField, StatusPill, spacing, supporting, IconTile } from '@/design-system';
+import { AttachmentField, Button, ConfirmDialog, EmptyState, ErrorView, FormField, LabelValue, LoadingView, Panel, PermissionChecklist, Row, Screen, SectionHeader, SelectField, StatusPill, spacing, supporting, IconTile } from '@/design-system';
 
 import { ROLE_OPTIONS } from '../../domain/validation';
 import { useBusinessProfileViewModel, useChangeHistoryViewModel } from '../viewmodels/useBusinessProfileViewModel';
@@ -55,6 +55,22 @@ export function BusinessProfileScreen({ onEdit, onOpenMembers, onOpenProducts, o
           description={vm.industryName}
           action={<StatusPill label={vm.statusLabel} tone={vm.isActive ? 'ok' : 'warn'} />}
         />
+        {vm.canEdit || vm.logo.path ? (
+        <AttachmentField
+          label="Logo"
+          hint={vm.canEdit ? 'Shown beside your business name. It is saved as soon as you choose it.' : undefined}
+          shape="square"
+          hasFile={Boolean(vm.logo.path)}
+          previewUri={vm.logo.previewUri}
+          isPdf={false}
+          uploading={vm.logo.uploading}
+          error={vm.logo.error}
+          disabled={!vm.canEdit}
+          onTakePhoto={vm.logo.takePhoto}
+          onChoosePhoto={vm.logo.choosePhoto}
+          onRemove={vm.logo.remove}
+        />
+        ) : null}
         <View style={styles.details}>
           <LabelValue half label="Stage" value={business.stage} />
           <LabelValue half label="Size" value={business.size} />

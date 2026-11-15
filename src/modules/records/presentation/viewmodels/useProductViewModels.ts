@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
 import { errorMessage } from '@/core/errors/AppError';
+import { useAttachment } from '@/core/files/useAttachment';
 import { formatMoney } from '@/core/format/format';
 import { useForm } from '@/core/forms/useForm';
 import { businessScope } from '@/core/query/queryClient';
@@ -11,9 +12,10 @@ import { useActiveBusiness } from '@/modules/business';
 import type { Product, ProductInput } from '../../domain/models';
 import { productFormSchema } from '../../domain/validation';
 import { useRecordsDependencies } from '../di';
+import { useFileLink } from './useReceipt';
 
 export function useProductListViewModel() {
-  const { products } = useRecordsDependencies();
+  const { products, files } = useRecordsDependencies();
   const { business, can } = useActiveBusiness();
   const [search, setSearch] = useState('');
 
@@ -21,12 +23,21 @@ export function useProductListViewModel() {
     queryKey: [...businessScope(business.id), 'products', 'list', { search }],
     queryFn: () => products.list(business.id, search),
   });
+  const imagePaths = (list.data ?? []).flatMap((product) => (product.imagePath ? [product.imagePath] : []));
+  // A photo that cannot be linked just shows the item's icon instead.
+  const imageLinks = useQuery({
+    queryKey: [...businessScope(business.id), 'file-links', imagePaths],
+    queryFn: () => files.linksFor(imagePaths).catch(() => ({}) as Record<string, string>),
+    enabled: imagePaths.length > 0,
+    staleTime: 30 * 60 * 1000,
+  });
 
   return {
     loading: list.isPending,
     error: list.error ? errorMessage(list.error) : null,
     retry: () => void list.refetch(),
     items: list.data ?? [],
+    imageFor: (product: Product) => (product.imagePath ? (imageLinks.data?.[product.imagePath] ?? null) : null),
     search,
     setSearch,
     canManage: can('products.manage'),
@@ -35,10 +46,11 @@ export function useProductListViewModel() {
 }
 
 export function useProductFormViewModel({ productId, onDone }: { productId?: string; onDone: () => void }) {
-  const { products } = useRecordsDependencies();
+  const { products, files } = useRecordsDependencies();
   const { business, can } = useActiveBusiness();
   const feedback = useFeedback();
   const queryClient = useQueryClient();
+  const image = useAttachment({ store: files, businessId: business.id, folder: 'products' });
   const form = useForm(productFormSchema, { kind: 'product', name: '', category: '', description: '', unit: '', sellingPrice: '' });
   const { reset } = form;
 
@@ -52,6 +64,12 @@ export function useProductFormViewModel({ productId, onDone }: { productId?: str
     if (existing.data) reset(toFormValues(existing.data));
   }, [existing.data, reset]);
 
+  const existingImage = useFileLink(existing.data?.imagePath);
+  const { load } = image;
+  useEffect(() => {
+    if (existing.data) load(existing.data.imagePath, existingImage.url);
+  }, [existing.data, existingImage.url, load]);
+
   const finish = async (message: string) => {
     await queryClient.invalidateQueries({ queryKey: businessScope(business.id) });
     feedback.success(message);
@@ -61,7 +79,10 @@ export function useProductFormViewModel({ productId, onDone }: { productId?: str
 
   const save = useMutation({
     mutationFn: (input: ProductInput) => (productId ? products.update(productId, input) : products.create(business.id, input)),
-    onSuccess: () => finish(productId ? 'Product updated.' : 'Product added.'),
+    onSuccess: () => {
+      image.commit();
+      return finish(productId ? 'Product updated.' : 'Product added.');
+    },
     ...report,
   });
 
@@ -72,15 +93,16 @@ export function useProductFormViewModel({ productId, onDone }: { productId?: str
     form,
     canManage: can('products.manage'),
     busy: save.isPending,
+    image,
     submit() {
       const input = form.validate();
-      if (input) save.mutate(input);
+      if (input) save.mutate({ ...input, imagePath: image.path });
     },
   };
 }
 
 export function useProductDetailViewModel({ productId, onRemoved }: { productId: string; onRemoved: () => void }) {
-  const { products } = useRecordsDependencies();
+  const { products, files } = useRecordsDependencies();
   const { business, can } = useActiveBusiness();
   const feedback = useFeedback();
   const queryClient = useQueryClient();
@@ -101,7 +123,12 @@ export function useProductDetailViewModel({ productId, onRemoved }: { productId:
     onError: (error) => feedback.error(errorMessage(error)),
   });
   const remove = useMutation({
-    mutationFn: () => products.remove(productId),
+    mutationFn: async () => {
+      const imagePath = detail.data?.imagePath;
+      await products.remove(productId);
+      // The photo goes with the item. If that fails the item is still deleted.
+      if (imagePath) await files.remove(imagePath).catch(() => undefined);
+    },
     onSuccess: async () => {
       await refresh();
       feedback.success('Product deleted.');
@@ -114,11 +141,13 @@ export function useProductDetailViewModel({ productId, onRemoved }: { productId:
   });
 
   const isActive = detail.data?.isActive ?? true;
+  const image = useFileLink(detail.data?.imagePath);
 
   return {
     loading: detail.isPending,
     error: detail.error ? errorMessage(detail.error) : null,
     product: detail.data ?? null,
+    image,
     isActive,
     money: (amount: number) => formatMoney(amount, business.currency),
     canManage: can('products.manage'),

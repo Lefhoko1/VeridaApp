@@ -40,7 +40,7 @@ const typeSchema = z
     }),
   );
 
-const COLUMNS = 'id, activity_type_id, occurred_on, quantity, unit, flock_id, notes, status, void_reason';
+const COLUMNS = 'id, activity_type_id, occurred_on, quantity, unit, flock_id, notes, status, void_reason, receipt_paths';
 
 const rowSchema = z.object({
   id: z.string(),
@@ -52,6 +52,7 @@ const rowSchema = z.object({
   notes: z.string().nullable(),
   status: z.enum(['recorded', 'voided']),
   void_reason: z.string().nullable(),
+  receipt_paths: z.array(z.string()).default([]),
 });
 
 const toRow = (input: ActivityInput) => ({
@@ -61,6 +62,7 @@ const toRow = (input: ActivityInput) => ({
   unit: input.unit,
   flock_id: input.flockId,
   notes: input.notes,
+  ...(input.receiptPaths !== undefined ? { receipt_paths: input.receiptPaths } : {}),
 });
 
 export class SupabaseActivityRepository implements ActivityRepository {
@@ -100,6 +102,7 @@ export class SupabaseActivityRepository implements ActivityRepository {
       notes: row.notes,
       status: row.status,
       voidReason: row.void_reason,
+      receiptPaths: row.receipt_paths,
     };
   }
 

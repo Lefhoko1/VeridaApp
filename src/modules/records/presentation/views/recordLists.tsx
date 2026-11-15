@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { Divider, List, Searchbar, Text } from 'react-native-paper';
 
 import { formatDate, formatQuantity } from '@/core/format/format';
-import { MultiSelectField, Button, DataTable, EmptyState, ErrorView, LoadingView, Panel, Row, Screen, SelectField, StatusPill, palette, spacing, supporting, IconTile, useWideLayout } from '@/design-system';
+import { MultiSelectField, Thumbnail, Button, DataTable, EmptyState, ErrorView, LoadingView, Panel, Row, Screen, SelectField, StatusPill, palette, spacing, supporting, useWideLayout } from '@/design-system';
 
 import { DATE_RANGE_OPTIONS } from '@/core/time/dateRange';
 
@@ -267,7 +267,7 @@ export function ProductListScreen({ onCreate, onOpen }: { onCreate: () => void; 
               flex: 2.4,
               render: (product) => (
                 <Row gap={spacing.sm}>
-                  <IconTile icon={product.kind === 'service' ? 'room-service-outline' : 'tag-outline'} size={32} />
+                  <Thumbnail uri={vm.imageFor(product)} size={32} fallbackIcon={product.kind === 'service' ? 'room-service-outline' : 'tag-outline'} />
                   <Text style={styles.cellStrong}>{product.name}</Text>
                 </Row>
               ),
@@ -285,7 +285,7 @@ export function ProductListScreen({ onCreate, onOpen }: { onCreate: () => void; 
             title={product.name}
             description={`${vm.money(product.sellingPrice)} per ${product.unit}`}
             onPress={() => onOpen(product.id)}
-            left={() => <IconTile icon={product.kind === 'service' ? 'room-service-outline' : 'tag-outline'} />}
+            left={() => <Thumbnail uri={vm.imageFor(product)} size={40} fallbackIcon={product.kind === 'service' ? 'room-service-outline' : 'tag-outline'} />}
             right={() => (product.isActive ? null : <StatusPill label="Inactive" tone="neutral" />)}
           />
         </View>

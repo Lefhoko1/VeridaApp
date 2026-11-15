@@ -12,6 +12,11 @@ const mockFeedback = { success: jest.fn(), error: jest.fn() };
 const mockPermissions = new Set(['records.create', 'records.edit', 'records.void']);
 
 jest.mock('@/design-system', () => ({ useFeedback: () => mockFeedback }));
+jest.mock('@/core/files/pickFile', () => ({
+  takePhoto: jest.fn(),
+  chooseDocument: jest.fn(),
+  choosePhoto: jest.fn(async () => ({ uri: 'file:///receipt.jpg', name: 'receipt.jpg', mimeType: 'image/jpeg' })),
+}));
 jest.mock('@/modules/business', () => ({
   useActiveBusiness: () => ({
     business: { id: 'biz-1', currency: 'BWP' },
@@ -32,6 +37,7 @@ const SALE: Sale = {
   notes: null,
   status: 'recorded',
   voidReason: null,
+  receiptPaths: [],
 };
 
 function fakeDependencies(): RecordsDependencies {
@@ -46,7 +52,7 @@ function fakeDependencies(): RecordsDependencies {
     },
     expenses: {} as RecordsDependencies['expenses'],
     products: {
-      list: jest.fn(async () => [{ id: 'p1', kind: 'product' as const, name: 'Tray', category: null, description: null, unit: 'tray', sellingPrice: 45, isActive: true }]),
+      list: jest.fn(async () => [{ id: 'p1', kind: 'product' as const, name: 'Tray', category: null, description: null, unit: 'tray', sellingPrice: 45, isActive: true, imagePath: null }]),
       get: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
@@ -54,6 +60,10 @@ function fakeDependencies(): RecordsDependencies {
       remove: jest.fn(),
     },
     categories: { list: jest.fn(async () => ['Egg sales', 'Other']), add: jest.fn() },
+    files: { upload: jest.fn(), linkFor: jest.fn(), linksFor: jest.fn(async () => ({})), remove: jest.fn() },
+    receipts: {
+      read: jest.fn(async () => ({ occurredOn: '2026-11-02', total: 90, description: 'Egg tray', vendor: null, category: 'egg sales', quantity: 3, unit: null, unitPrice: null })),
+    },
   };
 }
 
@@ -225,5 +235,63 @@ describe('useSaleFormViewModel', () => {
 
     await waitFor(() => expect(onDone).toHaveBeenCalled());
     expect(deps.categories.add).not.toHaveBeenCalled();
+  });
+
+  it('attaches a receipt, reads it into the form for checking, and saves it with the sale', async () => {
+    const { deps, onDone, wrapper } = setup();
+    (deps.files.upload as jest.Mock).mockResolvedValue('biz-1/receipts/abc.jpg');
+    const { result } = await renderHook(() => useSaleFormViewModel({ onDone }), { wrapper });
+    await waitFor(() => expect(result.current.form.values.category).toBe('Egg sales'));
+
+    await act(async () => result.current.receipt.choosePhoto());
+    await waitFor(() => expect(result.current.receipt.paths).toEqual(['biz-1/receipts/abc.jpg']));
+    expect(deps.files.upload).toHaveBeenCalledWith('biz-1', 'receipts', expect.objectContaining({ mimeType: 'image/jpeg' }));
+
+    await act(async () => result.current.receipt.readReceipt('biz-1/receipts/abc.jpg'));
+    await waitFor(() => expect(result.current.form.values.itemName).toBe('Egg tray'));
+    expect(deps.receipts.read).toHaveBeenCalledWith(expect.objectContaining({ businessId: 'biz-1', path: 'biz-1/receipts/abc.jpg', kind: 'sale' }));
+    // A total of 90 for 3 items becomes a unit price of 30, and the category matches whatever its case.
+    expect(result.current.form.values).toMatchObject({ occurredOn: '2026-11-02', quantity: '3', unitPrice: '30', category: 'Egg sales' });
+    // Reading never saves: the user confirms first (FR-G20).
+    expect(deps.sales.create).not.toHaveBeenCalled();
+
+    await act(async () => result.current.submit());
+    await waitFor(() => expect(deps.sales.create).toHaveBeenCalledWith('biz-1', expect.objectContaining({ receiptPaths: ['biz-1/receipts/abc.jpg'] })));
+    // A saved receipt is kept.
+    expect(deps.files.remove).not.toHaveBeenCalled();
+  });
+
+  it('deletes receipts that were uploaded but never saved when the form closes', async () => {
+    const { deps, onDone, wrapper } = setup();
+    (deps.files.upload as jest.Mock).mockResolvedValueOnce('biz-1/receipts/one.jpg').mockResolvedValueOnce('biz-1/receipts/two.jpg');
+    (deps.files.remove as jest.Mock).mockResolvedValue(undefined);
+    const { result, unmount } = await renderHook(() => useSaleFormViewModel({ onDone }), { wrapper });
+
+    await act(async () => result.current.receipt.choosePhoto());
+    await act(async () => result.current.receipt.choosePhoto());
+    await waitFor(() => expect(result.current.receipt.paths).toEqual(['biz-1/receipts/one.jpg', 'biz-1/receipts/two.jpg']));
+
+    // Removing an unsaved receipt deletes it straight away.
+    await act(async () => result.current.receipt.remove('biz-1/receipts/one.jpg'));
+    expect(deps.files.remove).toHaveBeenCalledWith('biz-1/receipts/one.jpg');
+
+    // Leaving without saving deletes the rest.
+    await act(async () => unmount());
+    expect(deps.files.remove).toHaveBeenCalledWith('biz-1/receipts/two.jpg');
+  });
+
+  it('deletes a saved receipt the user removed only once the change is saved', async () => {
+    const { deps, onDone, wrapper } = setup();
+    (deps.sales.get as jest.Mock).mockResolvedValue({ ...SALE, receiptPaths: ['biz-1/receipts/old.jpg'] });
+    (deps.files.remove as jest.Mock).mockResolvedValue(undefined);
+    const { result } = await renderHook(() => useSaleFormViewModel({ saleId: 'sale-1', onDone }), { wrapper });
+    await waitFor(() => expect(result.current.receipt.paths).toEqual(['biz-1/receipts/old.jpg']));
+
+    await act(async () => result.current.receipt.remove('biz-1/receipts/old.jpg'));
+    expect(deps.files.remove).not.toHaveBeenCalled();
+
+    await act(async () => result.current.submit());
+    await waitFor(() => expect(deps.sales.update).toHaveBeenCalledWith('sale-1', expect.objectContaining({ receiptPaths: [] })));
+    await waitFor(() => expect(deps.files.remove).toHaveBeenCalledWith('biz-1/receipts/old.jpg'));
   });
 });

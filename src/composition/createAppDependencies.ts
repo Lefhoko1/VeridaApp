@@ -1,9 +1,10 @@
 import { formatMoney, formatQuantity, todayIso } from '@/core/format/format';
 import type { SupabaseClient } from '@/core/supabase/client';
+import { SupabaseBusinessFileStore } from '@/core/supabase/businessFileStore';
 import { createAccountDependencies } from '@/modules/account';
 import { createAdministrationDependencies } from '@/modules/administration';
 import { createAnalyticsDependencies, type AnalyticsRepository, type Kpi } from '@/modules/analytics';
-import { createAssistantDependencies, type BusinessFact, type BusinessFactsProvider } from '@/modules/assistant';
+import { createAssistantDependencies, createReceiptReader, type BusinessFact, type BusinessFactsProvider } from '@/modules/assistant';
 import { createBusinessDependencies } from '@/modules/business';
 import { createLearningDependencies } from '@/modules/learning';
 import { createNotificationsDependencies } from '@/modules/notifications';
@@ -52,11 +53,14 @@ function createBusinessFactsProvider(analytics: AnalyticsRepository): BusinessFa
 
 export function createAppDependencies(client: SupabaseClient) {
   const analytics = createAnalyticsDependencies(client);
+  // Receipts, product photos and logos: one store, shared by the modules that attach files.
+  const files = new SupabaseBusinessFileStore(client);
   return {
     account: createAccountDependencies(client),
-    business: createBusinessDependencies(client),
-    records: createRecordsDependencies(client),
-    operations: createOperationsDependencies(client),
+    business: createBusinessDependencies(client, files),
+    // Records reads receipts through the assistant's AI service; this is where the two meet.
+    records: createRecordsDependencies(client, { files, receipts: createReceiptReader(client) }),
+    operations: createOperationsDependencies(client, files),
     analytics,
     learning: createLearningDependencies(client),
     assistant: createAssistantDependencies(client, createBusinessFactsProvider(analytics.analytics)),

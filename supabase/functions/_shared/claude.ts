@@ -12,7 +12,8 @@ export function isAiConfigured(): boolean {
 
 type ClaudeRequest<S extends z.ZodType> = {
   system: string;
-  messages: { role: 'user' | 'assistant'; content: string }[];
+  // Text, or text with an image or PDF, such as a receipt to read.
+  messages: Anthropic.Beta.BetaMessageParam[];
   schema: S;
   effort: 'low' | 'medium' | 'high';
 };

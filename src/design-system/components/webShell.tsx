@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
   navButton: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 13, paddingHorizontal: 14, borderRadius: 10 },
   navButtonHover: { backgroundColor: supporting.navHover },
   navButtonActive: { backgroundColor: supporting.navActive },
-  activeBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, borderTopLeftRadius: 10, borderBottomLeftRadius: 10, backgroundColor: palette.teal },
+  activeBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, borderTopLeftRadius: 10, borderBottomLeftRadius: 10, backgroundColor: palette.mutedCoral },
   navLabel: { flex: 1, color: supporting.navText, fontSize: 13, fontWeight: '600' },
   navLabelActive: { color: supporting.eyebrowText, fontWeight: '700' },
   badge: { minWidth: 20, paddingHorizontal: 6, height: 20, borderRadius: 10, backgroundColor: palette.mutedCoral, alignItems: 'center', justifyContent: 'center' },

@@ -24,6 +24,8 @@ export type ActivityRecord = {
   notes: string | null;
   status: 'recorded' | 'voided';
   voidReason: string | null;
+  // Where the receipts or other evidence are stored, if any were attached.
+  receiptPaths: string[];
 };
 
 export type ActivityInput = {
@@ -33,6 +35,8 @@ export type ActivityInput = {
   unit: string;
   flockId: string | null;
   notes: string | null;
+  // Left out by imports, which never carry a receipt.
+  receiptPaths?: string[];
 };
 
 export type Flock = {

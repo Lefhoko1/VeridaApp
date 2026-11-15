@@ -45,6 +45,8 @@ export type Workspace = BusinessDetails & {
   id: string;
   status: BusinessStatus;
   myRole: BusinessRole;
+  // Where the business logo is stored, if the owner added one.
+  logoPath: string | null;
 };
 
 export type Member = {

@@ -13,6 +13,7 @@ import { useActiveBusiness } from '@/modules/business';
 import type { Expense, ExpenseInput } from '../../domain/models';
 import { expenseFormSchema } from '../../domain/validation';
 import { useRecordsDependencies } from '../di';
+import { useFileLinks, useReceipts } from './useReceipt';
 import { useRecordFilters } from './useRecordFilters';
 
 export function useExpenseListViewModel() {
@@ -92,6 +93,22 @@ export function useExpenseFormViewModel({ expenseId, prefill, onDone }: { expens
     if (existing.data) reset(toFormValues(existing.data));
   }, [existing.data, reset]);
 
+  const receipt = useReceipts({
+    kind: 'expense',
+    existingPaths: expenseId ? existing.data?.receiptPaths : undefined,
+    categories: categoryOptions.data ?? [],
+    apply(reading) {
+      if (reading.occurredOn) setValue('occurredOn', reading.occurredOn);
+      const description = reading.description ?? reading.vendor;
+      if (description) setValue('description', description);
+      if (reading.total !== null) setValue('amount', String(reading.total));
+      const category = categoryOptions.data?.find((name) => name.toLowerCase() === reading.category?.toLowerCase());
+      if (category) setValue('category', category);
+      if (reading.quantity !== null) setValue('quantity', String(reading.quantity));
+      if (reading.unit) setValue('unit', reading.unit);
+    },
+  });
+
   const availableCategories = categoryOptions.data;
   const suggestedCategory = prefill?.category;
   useEffect(() => {
@@ -114,7 +131,10 @@ export function useExpenseFormViewModel({ expenseId, prefill, onDone }: { expens
       // A category typed under "Other" joins the list for next time. The expense is saved either way.
       if (!categoryOptions.data?.includes(input.category)) await categories.add(business.id, 'expense', input.category).catch(() => undefined);
     },
-    onSuccess: () => finish(expenseId ? 'Expense updated.' : 'Expense recorded.'),
+    onSuccess: () => {
+      receipt.commit();
+      return finish(expenseId ? 'Expense updated.' : 'Expense recorded.');
+    },
     ...report,
   });
 
@@ -130,9 +150,10 @@ export function useExpenseFormViewModel({ expenseId, prefill, onDone }: { expens
     categoryOptions: (categoryOptions.data ?? []).map((value) => ({ value, label: value })),
     canSave: !isVoided && can(expenseId ? 'records.edit' : 'records.create'),
     saving: save.isPending,
+    receipt,
     submit() {
       const input = form.validate();
-      if (input) save.mutate(input);
+      if (input) save.mutate({ ...input, receiptPaths: receipt.paths });
     },
   };
 }
@@ -160,11 +181,13 @@ export function useExpenseDetailViewModel(expenseId: string) {
   });
 
   const isVoided = detail.data?.status === 'voided';
+  const receiptLinks = useFileLinks(detail.data?.receiptPaths);
 
   return {
     loading: detail.isPending,
     error: detail.error ? errorMessage(detail.error) : null,
     expense: detail.data ?? null,
+    receipts: receiptLinks.files,
     isVoided,
     money: (amount: number) => formatMoney(amount, business.currency),
     canEdit: !isVoided && can('records.edit'),

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import type { SupabaseClient } from '@/core/supabase/client';
+import { mapProviderError } from '@/core/supabase/mapError';
 import { assertSuccess, numeric, parseRow, parseRows } from '@/core/supabase/response';
 
 import type { AdminBusiness, AdminBusinessDetail, AdminMember, AdminUser, AdminUserDetail, BusinessConfiguration, BusinessFilter, DeletionKind, DeletionRequest, PermissionMatrix, PersonPermission, PlatformPermission, PlatformRole, RoleAssignment, StaffRoleMatrix, UserFilter } from '../domain/models';
@@ -219,7 +220,26 @@ export class SupabaseDeletionRepository implements DeletionRepository {
 
   async erase(request: DeletionRequest): Promise<void> {
     const target = ERASE[request.kind];
+    // A business's receipts, photos and logo go first. Storage files can only be removed through
+    // the storage service, and once the business is gone nobody could reach them.
+    if (request.kind === 'business') await this.removeBusinessFiles(request.id);
     assertSuccess(await this.client.schema(target.schema).rpc(target.erase, { [target.argument]: request.id }));
+  }
+
+  private async removeBusinessFiles(businessId: string): Promise<void> {
+    const bucket = this.client.storage.from('business-files');
+    for (const folder of ['receipts', 'products', 'logo']) {
+      for (;;) {
+        const { data, error } = await bucket.list(`${businessId}/${folder}`, { limit: 100 });
+        // "Not found" means there is nothing stored there, which is nothing to remove.
+        if (error && 'status' in error && error.status === 404) break;
+        if (error) throw mapProviderError(error);
+        const paths = (data ?? []).map((item) => `${businessId}/${folder}/${item.name}`);
+        if (paths.length === 0) break;
+        const removed = await bucket.remove(paths);
+        if (removed.error) throw mapProviderError(removed.error);
+      }
+    }
   }
 
   async cancel(request: DeletionRequest): Promise<void> {
