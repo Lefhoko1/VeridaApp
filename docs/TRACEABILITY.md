@@ -83,8 +83,18 @@ Three later specifications in `requirements/` extend the original: the Business 
 | 1a Business categories and types | Taxonomy section 2: ten main categories and their subcategories, stored in `platform.business_categories` and `platform.industries`. Verida staff with Configuration add, rename, reorder and deactivate both under Business types, without app changes. Setup asks for a category, then a type within it, then any other types from any category | Done |
 | 1b Universal sales and expense categories | Taxonomy sections 3 and 4: nine sales and twelve expense categories, with the expense subcategories, in `platform.finance_categories`. Staff add, rename, reorder and deactivate them under Sales and expense categories. Each business type's own categories are reported under one of them, and every sale and expense stores the universal category it belongs to | Done |
 | 2 Activity catalogue | Ten activity groups, activity forms defined as data, an activity lifecycle, links to sales, expenses, products and a responsible person, owners switching activity types on or off, complete Poultry and Tuckshop sets, and the catalogue's activities for every other subcategory | Done |
-| 3, 4 Plan module | Goals, tasks, schedule, progress and reviews, then AI planning | Not started |
+| 3 Plan module, core (P0) | A Plan tab between Insights and Learn with Overview, Goals and Tasks. Measurable goals (increase, reduce, keep at a level, reach at least) and milestone goals, progress observations, goals that follow a Verida measure, tasks with priorities, statuses, due dates, assignees and blockers, many-to-many task and goal links, and the section 7 measures. New permissions: View plan, Work on tasks, Manage goals | Done |
+| 4 Plan module, schedule and collaboration (P1), then AI planning (P2) | Calendar views, repeating tasks, reminders, comments, weekly reviews, then AI suggestions | Not started |
 | 5 Sales, payments and offline capture | Line items, refunds, payments and offline sync | Not started |
+
+Notes on phase 3:
+
+- Progress is calculated only in the database (`plan.goal_progress`), using section 7's formulas. Without a starting value, an increase or reduction goal shows its actual and target but no percentage. A goal to keep a level or reach at least a figure says whether it is on track, never a percentage. A milestone goal shows how many milestones are done. Above 100% is shown as it is, with a note that the target was passed.
+- A goal can follow a measure the analytics service already calculates, over the goal's period so far. Otherwise people record dated observations, which are never edited; a later one replaces an earlier one.
+- Completion rate counts tasks due in the period, leaving out cancelled ones, and uses each task's current due date, so a rescheduled task counts where it now falls (an open decision in section 13). On-time rate counts completed tasks with a due date. Overdue uses the business's own day, from its time zone, which defaults to Africa/Gaborone.
+- Tasks and goals are never deleted, only cancelled, and every change is in the audit log. A task records a new version on each change, ready for offline sync in phase 5.
+- Owners and managers manage goals; staff create, update, assign and complete tasks; viewers can look. Owners can change this per person as with other permissions.
+- The decisions left open in section 13 were taken as: staff can be assigned tasks from the start, goals belong to one business, and AI plans come later and only on request.
 
 Notes on phase 2:
 

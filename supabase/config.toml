@@ -6,7 +6,7 @@ enabled = true
 port = 54321
 # Every module schema the client reaches through PostgREST. On a hosted project, set the same
 # list under Project Settings > API > Exposed schemas, or requests fail with "schema must be one of".
-schemas = ["identity", "authz", "platform", "business", "records", "operations", "analytics", "learning", "assistant", "notifications"]
+schemas = ["identity", "authz", "platform", "business", "records", "operations", "analytics", "learning", "assistant", "notifications", "plan"]
 extra_search_path = ["extensions"]
 max_rows = 1000
 

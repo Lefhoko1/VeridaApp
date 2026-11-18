@@ -13,7 +13,7 @@ import { createServer } from 'node:http';
 
 import { createDatabase } from '../database/harness.mjs';
 
-const EXPOSED_SCHEMAS = ['identity', 'authz', 'platform', 'business', 'records', 'operations', 'analytics', 'learning', 'assistant', 'notifications'];
+const EXPOSED_SCHEMAS = ['identity', 'authz', 'platform', 'business', 'records', 'operations', 'analytics', 'learning', 'assistant', 'notifications', 'plan'];
 export const VERIFICATION_CODE = '123456';
 // Stands in for the secret key that Edge Functions receive.
 export const SERVICE_KEY = 'emulator-service-key';

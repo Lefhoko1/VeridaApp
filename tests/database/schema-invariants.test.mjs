@@ -6,7 +6,7 @@ import { asUser, createDatabase, createUser } from './harness.mjs';
 
 const MODULE_SCHEMAS = [
   'identity', 'authz', 'audit', 'platform', 'business', 'records',
-  'operations', 'analytics', 'learning', 'assistant', 'notifications',
+  'operations', 'analytics', 'learning', 'assistant', 'notifications', 'plan',
 ];
 
 describe('schema invariants', () => {

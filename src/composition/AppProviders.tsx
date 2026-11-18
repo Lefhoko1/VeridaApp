@@ -16,6 +16,7 @@ import { ActiveBusinessProvider, BusinessDependenciesProvider } from '@/modules/
 import { LearningDependenciesProvider } from '@/modules/learning';
 import { NotificationsDependenciesProvider } from '@/modules/notifications';
 import { OperationsDependenciesProvider } from '@/modules/operations';
+import { PlanDependenciesProvider } from '@/modules/plan';
 import { RecordsDependenciesProvider } from '@/modules/records';
 
 import { createAppDependencies } from './createAppDependencies';
@@ -62,13 +63,15 @@ function ConfiguredProviders({ config, children }: { config: SupabaseConfig; chi
                 <LearningDependenciesProvider value={deps.learning}>
                   <AssistantDependenciesProvider value={deps.assistant}>
                     <NotificationsDependenciesProvider value={deps.notifications}>
-                      <SessionProvider>
-                        <EntryChoiceProvider>
-                          <ActiveBusinessProvider>
-                            <ThemedApp>{children}</ThemedApp>
-                          </ActiveBusinessProvider>
-                        </EntryChoiceProvider>
-                      </SessionProvider>
+                      <PlanDependenciesProvider value={deps.plan}>
+                        <SessionProvider>
+                          <EntryChoiceProvider>
+                            <ActiveBusinessProvider>
+                              <ThemedApp>{children}</ThemedApp>
+                            </ActiveBusinessProvider>
+                          </EntryChoiceProvider>
+                        </SessionProvider>
+                      </PlanDependenciesProvider>
                     </NotificationsDependenciesProvider>
                   </AssistantDependenciesProvider>
                 </LearningDependenciesProvider>

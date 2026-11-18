@@ -193,3 +193,20 @@ export function useReceivedInvitationsViewModel() {
     switchTo,
   };
 }
+
+// The active business's members as choices, for other modules that assign work to a person.
+// Someone who cannot see members gets an empty list rather than an error.
+export function useMemberOptions() {
+  const { memberships } = useBusinessDependencies();
+  const { business, can } = useActiveBusiness();
+  const members = useQuery({
+    queryKey: ['business', business.id, 'members', 'list'],
+    queryFn: () => memberships.listMembers(business.id),
+    enabled: can('members.view'),
+  });
+  const list = members.data ?? [];
+  return {
+    options: list.map((member) => ({ value: member.userId, label: member.fullName || member.email })),
+    nameOf: (userId: string | null) => (userId ? (list.find((member) => member.userId === userId)?.fullName ?? null) : null),
+  };
+}

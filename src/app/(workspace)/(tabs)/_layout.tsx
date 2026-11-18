@@ -52,6 +52,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="overview" options={{ title: 'Overview', tabBarIcon: tabIcon('view-dashboard-outline', 'view-dashboard') }} />
       <Tabs.Screen name="records" options={{ title: 'Records', tabBarIcon: tabIcon('notebook-edit-outline', 'notebook-edit') }} />
       <Tabs.Screen name="insights" options={{ title: 'Insights', tabBarIcon: tabIcon('chart-box-outline', 'chart-box') }} />
+      <Tabs.Screen name="plan" options={{ title: 'Plan', tabBarIcon: tabIcon('calendar-check-outline', 'calendar-check') }} />
       <Tabs.Screen name="learn" options={{ title: 'Learn', tabBarIcon: tabIcon('school-outline', 'school') }} />
       <Tabs.Screen name="ask" options={{ title: 'Ask Verida', tabBarIcon: tabIcon('creation-outline', 'creation') }} />
     </Tabs>

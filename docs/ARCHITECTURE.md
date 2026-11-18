@@ -43,6 +43,7 @@ No mocking of Supabase is needed to test a ViewModel. See `useSaleFormViewModel.
 | `learning` | F | `learning` | Content, lessons, review, progress | Record calculations |
 | `assistant` | G | `assistant` | Conversations, AI gateway | Authoritative figures |
 | `notifications` | H | `notifications` | Delivery and preferences | Business decisions |
+| `plan` | Plan Module Specification | `plan` | Goals, milestones, progress observations, tasks and their links | Business records and measures |
 | `administration` | A4, B3, G4, I | `platform`, and role-checked functions in others | Staff screens for users, businesses, configuration, roles and monitoring | Routine business operations |
 
 Learning content administration (F2) stays in `learning`, which owns that data. `authz` holds roles and permissions (the authorisation service in section 3.1), and `platform` holds industry configuration.

@@ -9,6 +9,7 @@ import { createBusinessDependencies } from '@/modules/business';
 import { createLearningDependencies } from '@/modules/learning';
 import { createNotificationsDependencies } from '@/modules/notifications';
 import { createOperationsDependencies, type RelatedRecordsSource } from '@/modules/operations';
+import { createPlanDependencies } from '@/modules/plan';
 import { createRecordsDependencies } from '@/modules/records';
 
 const FACT_PERIOD_DAYS = 30;
@@ -92,6 +93,7 @@ export function createAppDependencies(client: SupabaseClient) {
     assistant: createAssistantDependencies(client, createBusinessFactsProvider(analytics.analytics)),
     notifications: createNotificationsDependencies(client),
     administration: createAdministrationDependencies(client),
+    plan: createPlanDependencies(client),
   };
 }
 

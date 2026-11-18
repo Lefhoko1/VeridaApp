@@ -15,6 +15,7 @@ const MODULE_DEPENDENCIES = {
   assistant: ['business'],
   notifications: [],
   administration: ['account'],
+  plan: ['business'],
 };
 const MODULES = Object.keys(MODULE_DEPENDENCIES);
 

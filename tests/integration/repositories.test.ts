@@ -23,6 +23,7 @@ import { SupabaseActivityRepository } from '@/modules/operations/data/SupabaseAc
 import { SupabaseFlockRepository } from '@/modules/operations/data/SupabaseFlockRepository';
 import { SupabaseExpenseRepository } from '@/modules/records/data/SupabaseExpenseRepository';
 import { SupabaseCategoryRepository, SupabaseProductRepository } from '@/modules/records/data/SupabaseProductRepository';
+import { SupabasePlanRepository } from '@/modules/plan/data/SupabasePlanRepository';
 import { SupabaseSalesRepository } from '@/modules/records/data/SupabaseSalesRepository';
 
 const CODE = '123456';
@@ -556,5 +557,46 @@ describe('notifications', () => {
     expect((await notifications.list()).filter((n) => !n.isRead).length).toBe(2);
     await notifications.markAllRead();
     expect((await notifications.list()).every((n) => n.isRead)).toBe(true);
+  });
+});
+
+describe('plan', () => {
+  it('creates goals and tasks, links them and reports progress (Plan module P0)', async () => {
+    const { client } = await newUser('Planner');
+    const id = await newBusiness(client, { name: 'Planning Farm' });
+    const plan = new SupabasePlanRepository(client);
+    const measurable = {
+      description: null,
+      unit: 'trays',
+      tolerance: null,
+      kpiCode: null,
+      startOn: '2026-10-01',
+      targetOn: '2026-12-31',
+      status: 'active' as const,
+      statusReason: null,
+    };
+
+    const goalId = await plan.createGoal(id, { ...measurable, title: 'Sell more trays', goalType: 'measurable', direction: 'increase', baselineValue: 300, targetValue: 450 });
+    expect(await plan.goalProgress(goalId)).toMatchObject({ progressStatus: 'no_data', percent: null });
+    await plan.addProgress(id, goalId, { recordedOn: '2026-10-15', actualValue: 360, note: null });
+    expect(await plan.goalProgress(goalId)).toMatchObject({ actual: 360, percent: 40, source: 'manual' });
+
+    const steps = await plan.createGoal(id, { ...measurable, title: 'Open a second house', goalType: 'milestone', direction: null, unit: null, baselineValue: null, targetValue: null, targetOn: null });
+    await plan.addMilestone(id, steps, { title: 'Get quotes', dueOn: null, sortOrder: 1 });
+    const [milestone] = await plan.listMilestones(steps);
+    await plan.setMilestoneStatus(milestone!.id, 'completed');
+    expect(await plan.goalProgress(steps)).toMatchObject({ milestonesDone: 1, milestonesTotal: 1, percent: null });
+
+    const task = { title: 'Call two buyers', description: null, priority: 'high' as const, dueOn: '2026-10-20', blockerReason: null, assignedTo: null };
+    const taskId = await plan.createTask(id, { ...task, status: 'not_started', completionNote: null, goalIds: [goalId, steps] });
+    expect((await plan.getTask(taskId)).goalIds.sort()).toEqual([goalId, steps].sort());
+
+    await plan.updateTask(id, taskId, { ...task, status: 'completed', completionNote: 'Both agreed to visit', goalIds: [goalId] });
+    const [saved] = await plan.listTasks(id);
+    expect(saved).toMatchObject({ status: 'completed', completionNote: 'Both agreed to visit', goalIds: [goalId], version: 2 });
+    expect(saved!.completedAt).not.toBeNull();
+
+    expect(await plan.overview(id, { from: '2026-10-01', to: '2026-10-31' })).toMatchObject({ openTasks: 0, activeGoals: 2, eligibleDue: 1 });
+    expect((await plan.kpiOptions(id)).map((kpi) => kpi.code)).toContain('eggs_collected');
   });
 });

@@ -20,5 +20,6 @@ export type { BusinessCategory, Industry, Permission, Workspace } from './domain
 export { BusinessDependenciesProvider } from './presentation/di';
 export { ActiveBusinessProvider, useActiveBusiness, useBusinessContext, type ActiveBusiness } from './presentation/viewmodels/useActiveBusiness';
 export { useBusinessLogoUrl } from './presentation/viewmodels/useBusinessProfileViewModel';
+export { useMemberOptions } from './presentation/viewmodels/useMembersViewModel';
 export { BusinessProfileScreen, ChangeHistoryScreen, MemberPermissionsScreen, MembersScreen } from './presentation/views/businessScreens';
 export { BusinessSetupScreen } from './presentation/views/BusinessSetupScreen';

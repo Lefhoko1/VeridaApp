@@ -12,7 +12,10 @@ export type Permission =
   | 'records.void'
   | 'products.manage'
   | 'analytics.view'
-  | 'audit.view';
+  | 'audit.view'
+  | 'plan.view'
+  | 'plan.tasks'
+  | 'plan.goals';
 
 // A main category from the business taxonomy, such as Agriculture & farming.
 export type BusinessCategory = { code: string; name: string; description: string; icon: string };
