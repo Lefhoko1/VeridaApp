@@ -13,6 +13,7 @@ import type {
   BusinessConfiguration,
   BusinessFilter,
   DeletionRequest,
+  BusinessCategoryConfig,
   IndustryConfig,
   IndustryKpi,
   KpiDefinition,
@@ -60,6 +61,10 @@ export interface DeletionRepository {
 }
 
 export interface IndustryConfigRepository {
+  listBusinessCategories(): Promise<BusinessCategoryConfig[]>;
+  getBusinessCategory(code: string): Promise<BusinessCategoryConfig>;
+  createBusinessCategory(input: BusinessCategoryConfig): Promise<void>;
+  updateBusinessCategory(code: string, input: Omit<BusinessCategoryConfig, 'code'>): Promise<void>;
   listIndustries(): Promise<IndustryConfig[]>;
   getIndustry(code: string): Promise<IndustryConfig>;
   createIndustry(input: IndustryConfig): Promise<void>;

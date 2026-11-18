@@ -4,14 +4,25 @@ import { Divider, IconButton, List, Switch, Text } from 'react-native-paper';
 import { LabelValue, Button, EmptyState, ErrorView, FormField, LoadingView, Notice, Panel, Row, Screen, SectionHeader, SelectField, StatusPill, spacing, supporting } from '@/design-system';
 
 import { KPI_FORMULA_OPTIONS, KPI_UNIT_OPTIONS, YES_NO_OPTIONS } from '../../domain/validation';
-import { useIndustryDetailViewModel, useIndustryListViewModel, useKpiFormViewModel } from '../viewmodels/useIndustryViewModels';
+import { useBusinessCategoryViewModel, useIndustryDetailViewModel, useIndustryListViewModel, useKpiFormViewModel } from '../viewmodels/useIndustryViewModels';
 
 const KIND_OPTIONS = [
   { value: 'expense', label: 'Expense' },
   { value: 'sale', label: 'Sale' },
 ];
 
-export function IndustryListScreen({ onCreate, onOpen, onCreateKpi }: { onCreate: () => void; onOpen: (code: string) => void; onCreateKpi: () => void }) {
+const activePill = (isActive: boolean) => (isActive ? <StatusPill label="Active" tone="ok" /> : <StatusPill label="Inactive" tone="neutral" />);
+
+type IndustryListProps = {
+  onCreate: (categoryCode?: string) => void;
+  onOpen: (code: string) => void;
+  onCreateKpi: () => void;
+  onCreateCategory: () => void;
+  onOpenCategory: (code: string) => void;
+};
+
+// The business taxonomy: main categories, each with the business types (subcategories) in it.
+export function IndustryListScreen({ onCreate, onOpen, onCreateKpi, onCreateCategory, onOpenCategory }: IndustryListProps) {
   const vm = useIndustryListViewModel();
 
   if (vm.loading) return <LoadingView />;
@@ -19,34 +30,117 @@ export function IndustryListScreen({ onCreate, onOpen, onCreateKpi }: { onCreate
 
   return (
     <Screen>
-      <SectionHeader title="Industry configuration" description="Forms, categories and dashboards follow what is set here." />
+      <SectionHeader title="Business categories and types" description="What businesses choose at setup. Forms, categories and dashboards follow each type's settings." />
       <Row wrap>
-        <Button mode="contained" icon="plus" onPress={onCreate}>
-          Add industry
+        <Button mode="contained" icon="plus" onPress={onCreateCategory}>
+          Add category
+        </Button>
+        <Button mode="outlined" icon="plus" onPress={() => onCreate()}>
+          Add business type
         </Button>
         <Button mode="outlined" icon="plus" onPress={onCreateKpi}>
           Add KPI
         </Button>
       </Row>
-      <Panel style={styles.list}>
-        {vm.items.map((industry, index) => (
-          <View key={industry.code}>
-            {index > 0 ? <Divider /> : null}
-            <List.Item
-              title={industry.name}
-              description={industry.description}
-              onPress={() => onOpen(industry.code)}
-              right={() => (industry.isActive ? <StatusPill label="Active" tone="ok" /> : <StatusPill label="Inactive" tone="neutral" />)}
-            />
-          </View>
-        ))}
-      </Panel>
+      {vm.groups.map(({ category, items }) => (
+        <Panel key={category?.code ?? 'uncategorised'} style={styles.list}>
+          <List.Item
+            title={category?.name ?? 'Without a category'}
+            titleStyle={styles.groupTitle}
+            description={category ? `${items.length} ${items.length === 1 ? 'type' : 'types'}` : 'Open each type to choose its category.'}
+            left={category ? (props) => <List.Icon {...props} icon={category.icon} /> : undefined}
+            onPress={category ? () => onOpenCategory(category.code) : undefined}
+            right={category ? () => activePill(category.isActive) : undefined}
+          />
+          {items.map((industry) => (
+            <View key={industry.code}>
+              <Divider />
+              <List.Item title={industry.name} description={industry.description} onPress={() => onOpen(industry.code)} right={() => activePill(industry.isActive)} style={styles.indented} />
+            </View>
+          ))}
+          {category ? (
+            <Button compact icon="plus" onPress={() => onCreate(category.code)}>
+              Add a type to {category.name}
+            </Button>
+          ) : null}
+        </Panel>
+      ))}
     </Screen>
   );
 }
 
-export function IndustryDetailScreen({ code, onCreated }: { code?: string; onCreated: (code: string) => void }) {
-  const vm = useIndustryDetailViewModel({ code, onCreated });
+export function BusinessCategoryScreen({ code, onCreated, onOpenType }: { code?: string; onCreated: (code: string) => void; onOpenType: (code: string) => void }) {
+  const vm = useBusinessCategoryViewModel({ code, onCreated });
+
+  if (vm.loading) return <LoadingView />;
+  if (vm.error) return <ErrorView message={vm.error} />;
+  const { values, errors, setValue } = vm.form;
+
+  return (
+    <Screen variant="form">
+      <Panel>
+        <SectionHeader
+          title={vm.isNew ? 'New category' : 'Category'}
+          action={
+            vm.editing ? undefined : (
+              <Button compact icon="pencil-outline" onPress={vm.startEditing}>
+                Edit
+              </Button>
+            )
+          }
+        />
+        {vm.editing ? (
+          <>
+            <FormField label="Code" value={values.code} onChangeText={(v) => setValue('code', v)} error={errors.code} disabled={!vm.isNew} autoCapitalize="none" hint={vm.isNew ? 'Cannot be changed later.' : undefined} />
+            <FormField label="Name" value={values.name} onChangeText={(v) => setValue('name', v)} error={errors.name} />
+            <FormField label="Description (optional)" value={values.description} onChangeText={(v) => setValue('description', v)} error={errors.description} />
+            <FormField label="Icon name" value={values.icon} onChangeText={(v) => setValue('icon', v)} error={errors.icon} autoCapitalize="none" hint="A Material Community Icons name, such as sprout-outline." />
+            <FormField label="Position in the list" value={values.sortOrder} onChangeText={(v) => setValue('sortOrder', v)} error={errors.sortOrder} keyboardType="number-pad" />
+            <Button mode="contained" onPress={vm.save} loading={vm.busy} disabled={vm.busy}>
+              {vm.isNew ? 'Create category' : 'Save category'}
+            </Button>
+            {!vm.isNew ? (
+              <Button onPress={vm.cancelEditing} disabled={vm.busy}>
+                Cancel
+              </Button>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <LabelValue label="Code" value={values.code} />
+            <LabelValue label="Name" value={values.name} />
+            <LabelValue label="Description" value={values.description || 'None'} />
+            <LabelValue label="Icon name" value={values.icon} />
+            <LabelValue label="Position in the list" value={values.sortOrder} />
+          </>
+        )}
+        {!vm.isNew ? (
+          <Button onPress={vm.toggleActive} disabled={vm.busy} textColor={vm.isActive ? supporting.error : undefined}>
+            {vm.isActive ? 'Deactivate category' : 'Reactivate category'}
+          </Button>
+        ) : null}
+      </Panel>
+      {!vm.isNew ? (
+        <>
+          {!vm.isActive ? <Notice tone="info">Businesses that already use these types keep them. New businesses cannot choose them.</Notice> : null}
+          <Panel style={styles.list}>
+            <SectionHeader title="Business types" />
+            {vm.types.length === 0 ? <EmptyState title="No types in this category yet." /> : null}
+            {vm.types.map((industry, index) => (
+              <View key={industry.code}>
+                {index > 0 ? <Divider /> : null}
+                <List.Item title={industry.name} description={industry.description} onPress={() => onOpenType(industry.code)} right={() => activePill(industry.isActive)} />
+              </View>
+            ))}
+          </Panel>
+        </>
+      ) : null}
+    </Screen>
+  );
+}
+
+export function IndustryDetailScreen({ code, categoryCode, onCreated }: { code?: string; categoryCode?: string; onCreated: (code: string) => void }) {
+  const vm = useIndustryDetailViewModel({ code, categoryCode, onCreated });
 
   if (vm.loading) return <LoadingView />;
   if (vm.error) return <ErrorView message={vm.error} />;
@@ -69,6 +163,7 @@ export function IndustryDetailScreen({ code, onCreated }: { code?: string; onCre
         {vm.editing ? (
           <>
         <FormField label="Code" value={values.code} onChangeText={(v) => setValue('code', v)} error={errors.code} disabled={!vm.isNew} autoCapitalize="none" hint={vm.isNew ? 'Cannot be changed later.' : undefined} />
+        <SelectField label="Category" value={values.categoryCode} options={vm.categoryOptions} onChange={(v) => setValue('categoryCode', v)} error={errors.categoryCode} />
         <FormField label="Name" value={values.name} onChangeText={(v) => setValue('name', v)} error={errors.name} />
         <FormField label="Short name" value={values.shortName} onChangeText={(v) => setValue('shortName', v)} error={errors.shortName} />
         <FormField label="Description" value={values.description} onChangeText={(v) => setValue('description', v)} error={errors.description} />
@@ -86,6 +181,7 @@ export function IndustryDetailScreen({ code, onCreated }: { code?: string; onCre
         ) : (
           <>
             <LabelValue label="Code" value={values.code} />
+            <LabelValue label="Category" value={vm.categoryLabel} />
             <LabelValue label="Name" value={values.name} />
             <LabelValue label="Short name" value={values.shortName} />
             <LabelValue label="Description" value={values.description} />
@@ -234,6 +330,8 @@ export function KpiFormScreen({ onDone }: { onDone: () => void }) {
 
 const styles = StyleSheet.create({
   list: { padding: spacing.xs, gap: 0 },
+  groupTitle: { fontWeight: '600' },
+  indented: { paddingLeft: spacing.md },
   grow: { flex: 1, minWidth: 0 },
   muted: { fontSize: 11, color: supporting.mutedText },
   toggle: { alignItems: 'center' },

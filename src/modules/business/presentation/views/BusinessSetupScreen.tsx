@@ -12,8 +12,14 @@ import { SETUP_STEPS, useBusinessSetupViewModel } from '../viewmodels/useBusines
 
 const asOptions = (values: string[]) => values.map((value) => ({ value, label: value }));
 
-// Industries are data, so one added later simply takes the general picture.
-const INDUSTRY_ART: Record<string, IllustrationName> = { poultry: 'poultry', retail: 'retail', salon: 'salon', food: 'food', professional: 'professional' };
+// Categories are data, so one added later simply takes the general picture.
+const CATEGORY_ART: Record<string, IllustrationName> = {
+  agriculture: 'poultry',
+  retail_wholesale: 'retail',
+  beauty_personal: 'salon',
+  food_hospitality: 'food',
+  professional_services: 'professional',
+};
 
 export function BusinessSetupScreen({ existing, onDone }: { existing?: Workspace; onDone?: () => void }) {
   const { choice } = useEntryChoice();
@@ -87,26 +93,37 @@ function BusinessSetupForm({ existing, onDone }: { existing?: Workspace; onDone?
 
       {vm.step === 0 ? (
         <Reveal style={styles.section}>
-          <Text variant="titleMedium">What type of business do you run?</Text>
+          <Text variant="titleMedium">What kind of business do you run?</Text>
           <Text variant="bodySmall" style={styles.muted}>
-            Choose as many as apply. The first one you choose sets the dashboard&apos;s main figures.
+            Choose the closest match. Your main type sets the dashboard&apos;s main figures.
           </Text>
-          <Button mode={vm.allIndustriesSelected ? 'contained-tonal' : 'outlined'} icon={vm.allIndustriesSelected ? 'check' : undefined} onPress={vm.toggleAllIndustries}>
-            All of the above
-          </Button>
           <View style={styles.choices}>
-            {vm.industries.map((industry) => (
+            {vm.categories.map((category) => (
               <ChoiceCard
-                key={industry.code}
-                title={industry.name}
-                description={industry.description}
-                illustration={INDUSTRY_ART[industry.code] ?? 'other'}
-                selected={vm.selectedIndustries.includes(industry.code)}
-                multiple
-                onPress={() => vm.toggleIndustry(industry.code)}
+                key={category.code}
+                title={category.name}
+                description={category.description}
+                illustration={CATEGORY_ART[category.code] ?? 'other'}
+                selected={vm.categoryCode === category.code}
+                onPress={() => vm.chooseCategory(category.code)}
               />
             ))}
           </View>
+          {vm.categoryCode ? (
+            <SelectField label="Type of business" value={values.industryCode} options={vm.mainTypeOptions} onChange={vm.chooseMainType} error={errors.industryCode} />
+          ) : null}
+          {values.industryCode ? (
+            <MultiSelectField
+              label="Does your business do anything else? (optional)"
+              values={vm.additionalIndustries}
+              options={vm.additionalOptions}
+              onChange={vm.setAdditionalIndustries}
+              allowOther={false}
+              allLabel=""
+              emptyText="Nothing else"
+              hint="For example, a farm that also runs a shop."
+            />
+          ) : null}
           {vm.otherTypeSelected ? <FormField label="What kind of business is it?" value={values.otherType} onChangeText={(v) => setValue('otherType', v)} error={errors.otherType} /> : null}
           {vm.industryError ? <Notice>{vm.industryError}</Notice> : null}
           {vm.isEditing ? <Notice tone="info">You can add types at any time. A type can only be removed while it has no activity records.</Notice> : null}

@@ -77,9 +77,23 @@ export const businessConfigSchema = z.object({
   currency: z.string().trim().regex(/^[A-Z]{3}$/, 'Use a 3-letter currency code, such as BWP.'),
 });
 
+// FR-I01: a main category of the business taxonomy.
+export const businessCategorySchema = z.object({
+  code: codeField('Code'),
+  name: requiredText('Name', 80),
+  description: optionalText(200).transform((value) => value ?? ''),
+  icon: requiredText('Icon', 60),
+  sortOrder: z
+    .string()
+    .trim()
+    .regex(/^\d{1,4}$/, 'Enter a whole number for the position.')
+    .transform(Number),
+});
+
 // FR-I01, FR-I03.
 export const industrySchema = z.object({
   code: codeField('Code'),
+  categoryCode: z.string().min(1, 'Choose a category.'),
   name: requiredText('Name'),
   shortName: requiredText('Short name', 40),
   description: requiredText('Description', 200),

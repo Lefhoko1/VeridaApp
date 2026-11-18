@@ -379,7 +379,7 @@ describeLive('live Supabase project', () => {
 
       expect(await reviews.canReview()).toBe(true);
       const item = (await reviews.list({ status: 'pending_review' })).find((lesson) => lesson.id === state!.lessonId);
-      expect(item?.businessContext).toBe('LIVE TEST Farm · Agriculture · Poultry');
+      expect(item?.businessContext).toBe('LIVE TEST Farm · Poultry');
 
       await reviews.edit(item!.id, { title: 'LIVE TEST lesson', intro: 'Intro', example: 'Example', challenge: 'Challenge' });
       await reviews.decide(item!.id, 'approve', 'Good');

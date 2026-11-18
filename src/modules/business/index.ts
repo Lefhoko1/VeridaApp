@@ -16,7 +16,7 @@ export function createBusinessDependencies(client: SupabaseClient, files: Busine
 }
 
 export { industriesOf } from './domain/models';
-export type { Industry, Permission, Workspace } from './domain/models';
+export type { BusinessCategory, Industry, Permission, Workspace } from './domain/models';
 export { BusinessDependenciesProvider } from './presentation/di';
 export { ActiveBusinessProvider, useActiveBusiness, useBusinessContext, type ActiveBusiness } from './presentation/viewmodels/useActiveBusiness';
 export { useBusinessLogoUrl } from './presentation/viewmodels/useBusinessProfileViewModel';

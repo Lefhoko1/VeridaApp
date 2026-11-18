@@ -20,5 +20,5 @@ export { AdministrationDependenciesProvider } from './presentation/di';
 export { usePlatformAccess } from './presentation/viewmodels/usePlatformAccess';
 export { TeamAccessScreen } from './presentation/views/TeamAccessScreen';
 export { AiLogsScreen, AuditScreen, DeletionQueueScreen, MonitoringScreen, PlatformHubScreen, RolesScreen, StaffPermissionsScreen } from './presentation/views/governanceScreens';
-export { IndustryDetailScreen, IndustryListScreen, KpiFormScreen } from './presentation/views/industryScreens';
+export { BusinessCategoryScreen, IndustryDetailScreen, IndustryListScreen, KpiFormScreen } from './presentation/views/industryScreens';
 export { BusinessDetailScreen, BusinessListScreen, BusinessMemberPermissionsScreen, UserDetailScreen, UserListScreen } from './presentation/views/peopleScreens';

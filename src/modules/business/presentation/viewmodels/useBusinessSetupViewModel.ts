@@ -43,22 +43,25 @@ export function useBusinessSetupViewModel({ existing, onDone }: { existing?: Wor
     queryFn: () => businesses.listIndustries(),
     staleTime: Infinity,
   });
+  const categories = useQuery({
+    queryKey: ['platform', 'business-categories'],
+    queryFn: () => businesses.listCategories(),
+    staleTime: Infinity,
+  });
 
   const { values, setValue } = form;
   const [step, setStep] = useState(0);
   const [industryError, setIndustryError] = useState<string | null>(null);
+  // The category chosen on screen. Until someone picks one, it follows the main type's category.
+  const [chosenCategory, setChosenCategory] = useState<string | null>(null);
   // Which country the current currency came from, so the form can say so until someone overrides it.
   const [currencyFrom, setCurrencyFrom] = useState<string | null>(null);
 
-  // The first type chosen is the main one, and the rest follow in the order they were chosen.
-  const selectedIndustries = [values.industryCode, ...values.additionalIndustries.split(',')].filter(Boolean);
-  const applyIndustries = (codes: string[]) => {
-    setValue('industryCode', codes[0] ?? '');
-    setValue('additionalIndustries', codes.slice(1).join(','));
-    setIndustryError(null);
-  };
-  const allIndustryCodes = (industries.data ?? []).map((industry) => industry.code);
-
+  const industryList = industries.data ?? [];
+  const categoryList = categories.data ?? [];
+  const additionalIndustries = values.additionalIndustries.split(',').filter(Boolean);
+  const categoryCode = chosenCategory ?? industryList.find((industry) => industry.code === values.industryCode)?.categoryCode ?? '';
+  const categoryName = (code: string) => categoryList.find((category) => category.code === code)?.name ?? '';
   const save = useMutation({
     mutationFn: async (details: BusinessDetails) => {
       if (existing) {
@@ -81,20 +84,31 @@ export function useBusinessSetupViewModel({ existing, onDone }: { existing?: Wor
     isEditing: Boolean(existing),
     step,
     isLastStep: step === SETUP_STEPS - 1,
-    industries: industries.data ?? [],
-    loadingIndustries: industries.isPending,
+    loadingIndustries: industries.isPending || categories.isPending,
     form,
-    selectedIndustries,
+    // Step 1 of the taxonomy's onboarding: one main category, then one type within it.
+    categories: categoryList,
+    categoryCode,
+    chooseCategory(code: string) {
+      setChosenCategory(code);
+      setIndustryError(null);
+      const current = industryList.find((industry) => industry.code === values.industryCode);
+      if (current && current.categoryCode !== code) setValue('industryCode', '');
+    },
+    mainTypeOptions: industryList.filter((industry) => industry.categoryCode === categoryCode).map((industry) => ({ value: industry.code, label: industry.name })),
+    chooseMainType(code: string) {
+      setValue('industryCode', code);
+      setValue('additionalIndustries', additionalIndustries.filter((item) => item !== code).join(','));
+      setIndustryError(null);
+    },
+    // Step 2: anything else the business does, from any category, all optional.
+    additionalIndustries,
+    additionalOptions: industryList
+      .filter((industry) => industry.code !== values.industryCode)
+      .map((industry) => ({ value: industry.code, label: `${industry.name} (${categoryName(industry.categoryCode)})` })),
+    setAdditionalIndustries: (codes: string[]) => setValue('additionalIndustries', codes.filter((code) => code !== values.industryCode).join(',')),
     industryError,
-    toggleIndustry(code: string) {
-      applyIndustries(selectedIndustries.includes(code) ? selectedIndustries.filter((item) => item !== code) : [...selectedIndustries, code]);
-    },
-    allIndustriesSelected: allIndustryCodes.length > 0 && allIndustryCodes.every((code) => selectedIndustries.includes(code)),
-    toggleAllIndustries() {
-      const everything = allIndustryCodes.every((code) => selectedIndustries.includes(code));
-      applyIndustries(everything ? [] : [...selectedIndustries, ...allIndustryCodes.filter((code) => !selectedIndustries.includes(code))]);
-    },
-    otherTypeSelected: selectedIndustries.includes('other'),
+    otherTypeSelected: [values.industryCode, ...additionalIndustries].includes('other'),
     countryOptions: COUNTRY_OPTIONS,
     currencyOptions: CURRENCY_OPTIONS,
     // Picking a country fills in its currency, which can still be changed afterwards.
@@ -119,8 +133,8 @@ export function useBusinessSetupViewModel({ existing, onDone }: { existing?: Wor
     back: () => setStep((current) => Math.max(0, current - 1)),
     next() {
       if (step === 0) {
-        if (selectedIndustries.length === 0) {
-          setIndustryError('Choose at least one business type.');
+        if (!values.industryCode) {
+          setIndustryError(categoryCode ? 'Choose your type of business.' : 'Choose the kind of business you run.');
           return;
         }
         setStep(1);

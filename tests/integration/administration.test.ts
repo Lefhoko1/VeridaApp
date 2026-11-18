@@ -129,7 +129,10 @@ describe('administration', () => {
   it('configures an industry end to end, which then drives a new business', async () => {
     const industries = new SupabaseIndustryConfigRepository(admin.client);
     const code = `fishing_${Date.now()}`;
-    await industries.createIndustry({ code, name: 'Fishing', shortName: 'Fish', description: 'Boats', icon: 'fish', chartTitle: 'Catch', sortOrder: 50, isActive: true });
+    const categoryCode = `marine_${Date.now()}`;
+    await industries.createBusinessCategory({ code: categoryCode, name: `Marine ${Date.now()}`, description: 'The sea', icon: 'waves', sortOrder: 20, isActive: true });
+    expect((await industries.getBusinessCategory(categoryCode)).icon).toBe('waves');
+    await industries.createIndustry({ code, categoryCode, name: 'Fishing', shortName: 'Fish', description: 'Boats', icon: 'fish', chartTitle: 'Catch', sortOrder: 50, isActive: true });
     expect((await industries.getIndustry(code)).name).toBe('Fishing');
 
     await industries.addCategory(code, 'sale', 'Fresh fish');
@@ -144,8 +147,16 @@ describe('administration', () => {
     const kpiCode = `catch_${Date.now()}`;
     await industries.createKpiDefinition({ code: kpiCode, name: 'Catch', explanation: 'Fish landed.', formulaText: 'Sum', requiredData: 'Catch records', unitKind: 'quantity', formula: 'activity_total', activityCode: 'catch' });
     expect((await industries.listKpiDefinitions()).map((kpi) => kpi.code)).toContain(kpiCode);
+    // Every new type starts with the shared financial measures.
+    const shared = [
+      { kpiCode: 'revenue', isHighlight: true },
+      { kpiCode: 'expenses', isHighlight: true },
+      { kpiCode: 'recorded_balance', isHighlight: false },
+      { kpiCode: 'records_captured', isHighlight: false },
+    ];
+    expect(await industries.listIndustryKpis(code)).toEqual(shared);
     await industries.setIndustryKpi(code, kpiCode, true, true);
-    expect(await industries.listIndustryKpis(code)).toEqual([{ kpiCode, isHighlight: true }]);
+    expect(await industries.listIndustryKpis(code)).toContainEqual({ kpiCode, isHighlight: true });
 
     // A business in the new industry gets its activities, and the configured limit applies.
     const owner = await newUser();
@@ -157,12 +168,22 @@ describe('administration', () => {
 
     await expect(industries.removeActivityType(type!.id)).rejects.toMatchObject({ code: 'conflict' });
     await industries.setIndustryKpi(code, kpiCode, false, false);
-    expect(await industries.listIndustryKpis(code)).toEqual([]);
+    expect(await industries.listIndustryKpis(code)).toEqual(shared);
     await industries.removeCategory(category!.id);
     expect(await industries.listCategories(code)).toEqual([]);
 
-    await industries.updateIndustry(code, { name: 'Fishing', shortName: 'Fish', description: 'Boats', icon: 'fish', chartTitle: 'Catch', sortOrder: 50, isActive: false });
-    expect((await new SupabaseBusinessRepository(owner.client).listIndustries()).map((i) => i.code)).not.toContain(code);
+    const ownerBusinesses = new SupabaseBusinessRepository(owner.client);
+    expect((await ownerBusinesses.listIndustries()).find((i) => i.code === code)).toMatchObject({ categoryCode });
+    expect((await ownerBusinesses.listCategories()).map((c) => c.code)).toContain(categoryCode);
+
+    // Deactivating the category hides its types from setup.
+    await industries.updateBusinessCategory(categoryCode, { name: `Marine ${Date.now()}`, description: 'The sea', icon: 'waves', sortOrder: 20, isActive: false });
+    expect((await ownerBusinesses.listCategories()).map((c) => c.code)).not.toContain(categoryCode);
+    expect((await ownerBusinesses.listIndustries()).map((i) => i.code)).not.toContain(code);
+    await industries.updateBusinessCategory(categoryCode, { name: `Marine ${Date.now()}`, description: 'The sea', icon: 'waves', sortOrder: 20, isActive: true });
+
+    await industries.updateIndustry(code, { categoryCode, name: 'Fishing', shortName: 'Fish', description: 'Boats', icon: 'fish', chartTitle: 'Catch', sortOrder: 50, isActive: false });
+    expect((await ownerBusinesses.listIndustries()).map((i) => i.code)).not.toContain(code);
   });
 
   it('manages roles and the permission matrix', async () => {

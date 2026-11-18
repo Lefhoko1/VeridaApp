@@ -12,7 +12,7 @@ export function platformEntries(can: ReturnType<typeof usePlatformAccess>['can']
     can('users.manage') && { key: 'users', title: 'Users', description: 'Search, suspend and reactivate accounts', icon: 'account-multiple-outline', href: '/admin/users' },
     can('businesses.manage') && { key: 'businesses', title: 'Businesses', description: 'Search, configure and suspend businesses, and manage their teams', icon: 'domain', href: '/admin/businesses' },
     can('deletions.process') && { key: 'deletions', title: 'Deletion requests', description: 'Retention period, cancelling and erasing', icon: 'delete-clock-outline', href: '/admin/deletions' },
-    can('configuration.manage') && { key: 'industries', title: 'Industries', description: 'Categories, activities and KPIs', icon: 'tune-variant', href: '/admin/industries' },
+    can('configuration.manage') && { key: 'industries', title: 'Business types', description: 'Categories, types, activities and KPIs', icon: 'tune-variant', href: '/admin/industries' },
     can('content.manage') && { key: 'content', title: 'Learning content', description: 'Approved material for lessons', icon: 'book-open-outline', href: '/admin/content' },
     can('roles.manage') && { key: 'roles', title: 'Roles and permissions', description: 'Who can do what', icon: 'shield-account-outline', href: '/admin/roles' },
     can('monitoring.view') && { key: 'monitoring', title: 'Monitoring', description: 'Usage, availability and errors', icon: 'chart-line', href: '/admin/monitoring' },

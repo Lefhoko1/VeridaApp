@@ -14,8 +14,13 @@ export type Permission =
   | 'analytics.view'
   | 'audit.view';
 
+// A main category from the business taxonomy, such as Agriculture & farming.
+export type BusinessCategory = { code: string; name: string; description: string; icon: string };
+
+// A business type, which the taxonomy calls a subcategory, such as Poultry.
 export type Industry = {
   code: string;
+  categoryCode: string;
   name: string;
   shortName: string;
   description: string;

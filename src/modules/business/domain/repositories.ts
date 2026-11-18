@@ -1,5 +1,6 @@
 import type {
   AssignableRole,
+  BusinessCategory,
   BusinessDetails,
   BusinessStatus,
   ChangeEntry,
@@ -13,6 +14,7 @@ import type {
 } from './models';
 
 export interface BusinessRepository {
+  listCategories(): Promise<BusinessCategory[]>;
   listIndustries(): Promise<Industry[]>;
   listWorkspaces(): Promise<Workspace[]>;
   listPermissions(businessId: string): Promise<Permission[]>;

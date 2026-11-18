@@ -68,8 +68,20 @@ export type DeletionRequest = { kind: DeletionKind; id: string; name: string; de
 
 export type BusinessConfiguration = { industryCode: string; stage: string; size: string; currency: string };
 
+// A main category of the business taxonomy, which groups business types (FR-I01).
+export type BusinessCategoryConfig = {
+  code: string;
+  name: string;
+  description: string;
+  icon: string;
+  sortOrder: number;
+  isActive: boolean;
+};
+
+// A business type, which the taxonomy calls a subcategory.
 export type IndustryConfig = {
   code: string;
+  categoryCode: string;
   name: string;
   shortName: string;
   description: string;

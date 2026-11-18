@@ -55,7 +55,7 @@ Emails are sent from `accounts@verida.vinabbie.com`, on the `verida.vinabbie.com
 | Receipts, product photos and logos | Added at the project owner's request. Sales, expenses and activity records can carry up to ten receipts (photos or PDFs), products a photo, and the business a logo. A file uploaded but never saved is deleted when the form closes, and one removed from a saved record is deleted when the change is saved. Files sit in a private storage bucket under the business, and each folder follows the permission of its data: receipts need Capture or Edit records, photos Manage products, the logo Manage business, and seeing any of them View records. Staff erasing a business remove its files first. The AI reads a receipt into the form for the user to check and save (FR-G20); it never saves a record |
 | Landing page and sign-in | Added at the project owner's request. Everyone who is not signed in, in the app and on the website, first sees a page about Verida. Sign-in and registration default to a business; the Verida team uses a small link at the foot of each |
 | Viewing before editing | Added at the project owner's request. Lists open a read-only profile with an Edit button, for sales, expenses, activity, products, flocks and learning content. Lesson review still opens its editable text, because correcting it is the task |
-| FR-B02, B03 Business details | Extended at the project owner's request. Business type, reasons and record keeping accept several answers, All of the above and Other. Country is searchable across 251 countries, and it suggests the currency, which is required and can be changed. Lessons and the assistant use only the main business type |
+| FR-B02, B03 Business details | Extended at the project owner's request. Business type follows the taxonomy: a main category, a type within it, and optionally more types. Reasons and record keeping accept several answers, All of the above and Other. Country is searchable across 251 countries, and it suggests the currency, which is required and can be changed. Lessons and the assistant use only the main business type |
 | FR-C04, C05 Categories | A record keeps one category, so that no figure is counted twice. Other adds a new category from the dropdown, and filters accept several |
 | FR-A20, A21, A27, B13 Leaving Verida | Nobody can leave while they own a running business or are the only active administrator. A request removes access and waits out a retention period, 90 days and changeable on screen. Staff then cancel or erase from the deletion queue. Nothing is erased automatically |
 | Erasing an account | Personal details, sign-in details, conversations, lessons and notifications are removed. The row stays as "Deleted user", so records the person entered for a business still say who entered them |
@@ -73,6 +73,25 @@ Emails are sent from `accounts@verida.vinabbie.com`, on the `verida.vinabbie.com
 | FR-I05 to I07 Industry configuration | A new KPI can total or take the latest value of an activity without code. A genuinely new kind of calculation needs a new formula in `analytics.evaluate_kpi`. Configurable validation covers an activity's minimum, maximum, whether it may be negative or must be whole, whether a note is required, and its allowed units. It does not extend to sales and expenses |
 | FR-I10 Monitoring | Availability is measured from the staff member's own device when the screen opens. Reported errors alert staff, at most once an hour. Nothing checks availability in the background, so an outage that reports no error raises no alert |
 | FR-I12 Roles and permissions | Staff hold an Administrator, Learning reviewer or Support role, and each person can be given or denied individual permissions. Administrators always hold everything, and only they can create or remove another. The business role matrix applies to every business at once |
+
+## Specifications added on 2026-11-18
+
+Three later specifications in `requirements/` extend the original: the Business Taxonomy & Configuration Catalogue, the Industry-specific Activity Catalogue and the Plan Module Developer Specification. They are being built in phases.
+
+| Phase | Scope | Status |
+| --- | --- | --- |
+| 1a Business categories and types | Taxonomy section 2: ten main categories and their subcategories, stored in `platform.business_categories` and `platform.industries`. Verida staff with Configuration add, rename, reorder and deactivate both under Business types, without app changes. Setup asks for a category, then a type within it, then any other types from any category | Done |
+| 1b Universal sales and expense categories | Taxonomy sections 3 and 4 | Not started |
+| 2 Activity catalogue | Activity groups, configurable activity forms, and full activity sets for Poultry and Tuckshop | Not started |
+| 3, 4 Plan module | Goals, tasks, schedule, progress and reviews, then AI planning | Not started |
+| 5 Sales, payments and offline capture | Line items, refunds, payments and offline sync | Not started |
+
+Notes on phase 1a:
+
+- The catalogue's lists hold 87 subcategories, although its summary says 85. All 87 are loaded.
+- The six original types kept their codes and became subcategories: Poultry, Tuckshop / convenience shop, Hair salon, Restaurant, Consulting and Other business. Existing businesses and records are unchanged. Their activities and measures remain, and new types start with the shared financial measures until phase 2 adds their activities.
+- A type can be chosen only while it and its category are both active. A business that already has a deactivated type keeps it. The database enforces this, not just the screens.
+- A category cannot be deleted while it has types, and a type cannot be deleted while a business uses it. Deactivate them instead, which keeps history readable.
 
 ## Section 5: CRUD and action classification
 

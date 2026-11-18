@@ -4,12 +4,13 @@ import type { KeyValueStore } from '@/core/storage/keyValueStore';
 import type { SupabaseClient } from '@/core/supabase/client';
 import { assertSuccess, parseRow, parseRows } from '@/core/supabase/response';
 
-import type { BusinessDetails, BusinessStatus, ChangeEntry, Industry, Permission, Workspace } from '../domain/models';
+import type { BusinessCategory, BusinessDetails, BusinessStatus, ChangeEntry, Industry, Permission, Workspace } from '../domain/models';
 import type { ActiveBusinessStore, BusinessRepository } from '../domain/repositories';
 
 const industrySchema = z
   .object({
     code: z.string(),
+    category_code: z.string(),
     name: z.string(),
     short_name: z.string(),
     description: z.string(),
@@ -19,6 +20,7 @@ const industrySchema = z
   .transform(
     (row): Industry => ({
       code: row.code,
+      categoryCode: row.category_code,
       name: row.name,
       shortName: row.short_name,
       description: row.description,
@@ -26,6 +28,10 @@ const industrySchema = z
       chartTitle: row.chart_title,
     }),
   );
+
+const categorySchema = z
+  .object({ code: z.string(), name: z.string(), description: z.string(), icon: z.string() })
+  .transform((row): BusinessCategory => row);
 
 const workspaceSchema = z
   .object({
@@ -95,16 +101,33 @@ export class SupabaseBusinessRepository implements BusinessRepository {
     return this.client.schema('business');
   }
 
-  async listIndustries(): Promise<Industry[]> {
+  async listCategories(): Promise<BusinessCategory[]> {
     return parseRows(
-      industrySchema,
-      await this.client
+      categorySchema,
+      await this.client.schema('platform').from('business_categories').select('code, name, description, icon').eq('is_active', true).order('sort_order'),
+    );
+  }
+
+  // Only types that can be chosen: active, in an active category. The database applies the
+  // same rule when a business is saved.
+  async listIndustries(): Promise<Industry[]> {
+    const [categories, industries] = await Promise.all([
+      this.listCategories(),
+      this.client
         .schema('platform')
         .from('industries')
-        .select('code, name, short_name, description, icon, chart_title')
+        .select('code, category_code, name, short_name, description, icon, chart_title')
         .eq('is_active', true)
-        .order('sort_order'),
-    );
+        .order('sort_order')
+        .then((response) => parseRows(industrySchema, response)),
+    ]);
+    // Positions are counted within each category, so the categories' order comes first.
+    const position = new Map(categories.map((category, index) => [category.code, index]));
+    return industries
+      .filter((industry) => position.has(industry.categoryCode))
+      .map((industry, index) => ({ industry, index }))
+      .sort((a, b) => (position.get(a.industry.categoryCode) ?? 0) - (position.get(b.industry.categoryCode) ?? 0) || a.index - b.index)
+      .map(({ industry }) => industry);
   }
 
   async listWorkspaces(): Promise<Workspace[]> {

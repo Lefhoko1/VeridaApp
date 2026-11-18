@@ -161,11 +161,12 @@ describe('administration', () => {
 
   test('manages industry configuration through RLS (FR-I01 to I07)', async () => {
     await asUser(db, admin.id, async (tx) => {
-      await tx.query(`insert into platform.industries (code, name, short_name, description, icon, chart_title) values ('fishing', 'Fishing', 'Fish', 'Boats', 'fish', 'Catch')`);
+      await tx.query(`insert into platform.industries (code, category_code, name, short_name, description, icon, chart_title) values ('fishing', 'agriculture', 'Fishing', 'Fish', 'Boats', 'fish', 'Catch')`);
       await tx.query(`insert into platform.record_categories (industry_code, kind, name) values ('fishing', 'sale', 'Fresh fish')`);
       await tx.query(`insert into platform.activity_types (industry_code, code, name, default_unit, max_quantity) values ('fishing', 'catch', 'Catch', 'kg', 500)`);
       await tx.query(`insert into platform.kpi_definitions (code, name, explanation, formula_text, required_data, unit_kind, formula, activity_code) values ('catch_total', 'Catch', 'x', 'Sum', 'Catch records', 'quantity', 'activity_total', 'catch')`);
-      await tx.query(`insert into platform.industry_kpis (industry_code, kpi_code, is_highlight) values ('fishing', 'catch_total', true), ('fishing', 'revenue', true)`);
+      // Revenue and the other shared measures arrive with the new type.
+      await tx.query(`insert into platform.industry_kpis (industry_code, kpi_code, is_highlight) values ('fishing', 'catch_total', true)`);
     });
 
     const boat = await registerBusiness(db, owner.id, { name: 'Boat', industry: 'fishing' });

@@ -153,11 +153,21 @@ describe('account', () => {
 });
 
 describe('business', () => {
-  it('lists the six industry configurations', async () => {
+  it('lists the taxonomy: categories, then their types in order', async () => {
     const { client } = await newUser();
-    const industries = await new SupabaseBusinessRepository(client).listIndustries();
-    expect(industries.map((i) => i.code)).toEqual(['poultry', 'retail', 'salon', 'food', 'professional', 'other']);
-    expect(industries[0]).toMatchObject({ shortName: 'Farm', chartTitle: 'Production and farm activity' });
+    const repository = new SupabaseBusinessRepository(client);
+    const categories = await repository.listCategories();
+    expect(categories).toHaveLength(10);
+    expect(categories[0]).toMatchObject({ code: 'agriculture', name: 'Agriculture & farming' });
+
+    const industries = await repository.listIndustries();
+    expect(industries).toHaveLength(87);
+    expect(industries.slice(0, 2).map((i) => i.code)).toEqual(['crop_farming', 'poultry']);
+    expect(industries.at(-1)).toMatchObject({ code: 'other', categoryCode: 'digital_creative_other' });
+    // Every category's types sit together, in the categories' order.
+    const order = industries.map((i) => categories.findIndex((c) => c.code === i.categoryCode));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(industries[1]).toMatchObject({ name: 'Poultry', shortName: 'Farm', chartTitle: 'Production and farm activity' });
   });
 
   it('registers a business and makes the creator its owner (FR-B01 to FR-B05)', async () => {
@@ -446,7 +456,7 @@ describe('learning', () => {
       title: 'Start building a useful business record',
       generatedBy: 'template',
       businessId: id,
-      businessContext: 'Vinabbie AgriSolutions · Agriculture · Poultry',
+      businessContext: 'Vinabbie AgriSolutions · Poultry',
     });
 
     await reviews.edit(item!.id, { title: 'Edited', intro: 'Intro', example: 'Example', challenge: 'Challenge' });

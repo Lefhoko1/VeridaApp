@@ -3,16 +3,17 @@ import { z } from 'zod';
 import type { SupabaseClient } from '@/core/supabase/client';
 import { assertSuccess, nullableNumeric, numeric, parseRow, parseRows } from '@/core/supabase/response';
 
-import type { ActivityTypeConfig, ActivityTypeInput, IndustryConfig, IndustryKpi, KpiDefinition, RecordCategory } from '../domain/models';
+import type { ActivityTypeConfig, ActivityTypeInput, BusinessCategoryConfig, IndustryConfig, IndustryKpi, KpiDefinition, RecordCategory } from '../domain/models';
 import type { IndustryConfigRepository } from '../domain/repositories';
 
-const INDUSTRY_COLUMNS = 'code, name, short_name, description, icon, chart_title, sort_order, is_active';
+const INDUSTRY_COLUMNS = 'code, category_code, name, short_name, description, icon, chart_title, sort_order, is_active';
 
 const industrySchema = z
-  .object({ code: z.string(), name: z.string(), short_name: z.string(), description: z.string(), icon: z.string(), chart_title: z.string(), sort_order: numeric, is_active: z.boolean() })
+  .object({ code: z.string(), category_code: z.string(), name: z.string(), short_name: z.string(), description: z.string(), icon: z.string(), chart_title: z.string(), sort_order: numeric, is_active: z.boolean() })
   .transform(
     (row): IndustryConfig => ({
       code: row.code,
+      categoryCode: row.category_code,
       name: row.name,
       shortName: row.short_name,
       description: row.description,
@@ -24,11 +25,35 @@ const industrySchema = z
   );
 
 const toIndustryRow = (input: Omit<IndustryConfig, 'code'>) => ({
+  category_code: input.categoryCode,
   name: input.name,
   short_name: input.shortName,
   description: input.description,
   icon: input.icon,
   chart_title: input.chartTitle,
+  sort_order: input.sortOrder,
+  is_active: input.isActive,
+});
+
+const CATEGORY_COLUMNS = 'code, name, description, icon, sort_order, is_active';
+
+const businessCategorySchema = z
+  .object({ code: z.string(), name: z.string(), description: z.string(), icon: z.string(), sort_order: numeric, is_active: z.boolean() })
+  .transform(
+    (row): BusinessCategoryConfig => ({
+      code: row.code,
+      name: row.name,
+      description: row.description,
+      icon: row.icon,
+      sortOrder: row.sort_order,
+      isActive: row.is_active,
+    }),
+  );
+
+const toCategoryRow = (input: Omit<BusinessCategoryConfig, 'code'>) => ({
+  name: input.name,
+  description: input.description,
+  icon: input.icon,
   sort_order: input.sortOrder,
   is_active: input.isActive,
 });
@@ -104,6 +129,22 @@ export class SupabaseIndustryConfigRepository implements IndustryConfigRepositor
 
   private get db() {
     return this.client.schema('platform');
+  }
+
+  async listBusinessCategories(): Promise<BusinessCategoryConfig[]> {
+    return parseRows(businessCategorySchema, await this.db.from('business_categories').select(CATEGORY_COLUMNS).order('sort_order'));
+  }
+
+  async getBusinessCategory(code: string): Promise<BusinessCategoryConfig> {
+    return parseRow(businessCategorySchema, await this.db.from('business_categories').select(CATEGORY_COLUMNS).eq('code', code).single());
+  }
+
+  async createBusinessCategory(input: BusinessCategoryConfig): Promise<void> {
+    assertSuccess(await this.db.from('business_categories').insert({ code: input.code, ...toCategoryRow(input) }));
+  }
+
+  async updateBusinessCategory(code: string, input: Omit<BusinessCategoryConfig, 'code'>): Promise<void> {
+    assertSuccess(await this.db.from('business_categories').update(toCategoryRow(input)).eq('code', code));
   }
 
   async listIndustries(): Promise<IndustryConfig[]> {

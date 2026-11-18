@@ -93,7 +93,7 @@ Each module has its own Postgres schema and its own migration file. A module's t
 
 ### Extending the platform
 
-Industries are data, not code. To add one, insert rows in `platform.industries`, `record_categories`, `activity_types` and `industry_kpis`. Forms, categories and dashboards adapt without any app change. Only a genuinely new kind of calculation needs a new `formula` in `analytics.evaluate_kpi`.
+Industries are data, not code. Each business type (`platform.industries`, a subcategory in the Business Taxonomy) belongs to a main category in `platform.business_categories`. Staff add both on the Business types screen. A new type automatically gets the shared financial KPIs, and its own rows in `record_categories`, `activity_types` and `industry_kpis` add the rest. Forms, categories and dashboards adapt without any app change. Only a genuinely new kind of calculation needs a new `formula` in `analytics.evaluate_kpi`.
 
 ### Where calculations live
 
@@ -154,7 +154,7 @@ A sale, expense or activity keeps one category or type, because a figure counted
 
 Countries and currencies are plain data in `core/geo/countries.ts`, generated from the MIT-licensed `countries-list` package. A country suggests its currency, and the person can choose another.
 
-A business has a main type (`industry_code`) and any number of others (`additional_industries`), plus a typed description (`other_type`). Categories, activities and measures come from all of them. Only the main type's highlights lead the dashboard, and lessons and the assistant use the main type. `business.all_industries` is the one place that combines them. A type can be removed only while no activity record depends on it.
+A business has a main type (`industry_code`) and any number of others (`additional_industries`), plus a typed description (`other_type`). Setup asks for a category first and then a type within it, and `platform.is_selectable_industry` decides which types can be chosen. Categories, activities and measures come from all of them. Only the main type's highlights lead the dashboard, and lessons and the assistant use the main type. `business.all_industries` is the one place that combines them. A type can be removed only while no activity record depends on it.
 
 ## Look and motion
 
