@@ -298,7 +298,7 @@ describe('edge functions under Deno', () => {
 
     const sent = fakeRequests.findLast((r) => r.url === '/emails' && r.body.to === user.email);
     assert.equal(sent.body.subject, 'Welcome to Verida');
-    assert.match(sent.body.from, /onboarding@resend\.dev/);
+    assert.match(sent.body.from, /accounts@verida\.vinabbie\.com/);
     assert.match(sent.body.html, /verida/);
   });
 

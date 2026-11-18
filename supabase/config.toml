@@ -60,15 +60,16 @@ otp_expiry = 3600
 
 # Resend. The key comes from the environment and must never be written in this file:
 #   RESEND_API_KEY=... npx supabase config push
-# admin_email must be on a domain verified in Resend (vinabbie.com); otherwise Resend only
-# delivers to the Resend account's own address.
+# admin_email must be on a domain verified in Resend (verida.vinabbie.com); otherwise Resend
+# only delivers to the Resend account's own address. Cloudflare Email Routing forwards
+# accounts@, sales@ and support@verida.vinabbie.com to the team inbox, so replies arrive.
 [auth.email.smtp]
 enabled = true
 host = "smtp.resend.com"
 port = 465
 user = "resend"
 pass = "env(RESEND_API_KEY)"
-admin_email = "no-reply@vinabbie.com"
+admin_email = "accounts@verida.vinabbie.com"
 sender_name = "Verida"
 
 # The app verifies emailed one-time codes rather than deep links, so these templates must

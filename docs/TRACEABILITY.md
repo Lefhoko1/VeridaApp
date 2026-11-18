@@ -45,7 +45,7 @@ Administrative requirements are complete, but nobody can use them until a first 
 | FR-H09 Email delivery | A Resend API key set as a Supabase secret. The dispatch job has been scheduled since 2026-11-03 | In-app delivery works and is recorded. Emails wait in the queue |
 | FR-H04 Learning reminders | A first run to confirm. The daily job has been scheduled since 2026-11-03, and had not yet run when checked on 2026-11-04 | The function that sends them is built and tested |
 
-Emails are sent from `no-reply@vinabbie.com`, verified in Resend on 2026-11-13. Sign-up codes reached an outside address the same day. Notification emails (FR-H09) still need a first real delivery to confirm.
+Emails are sent from `accounts@verida.vinabbie.com`, on the `verida.vinabbie.com` subdomain verified in Resend on 2026-11-17 (the parent `vinabbie.com` was verified on 2026-11-13). Cloudflare Email Routing forwards `accounts@`, `sales@` and `support@verida.vinabbie.com` to the team's Gmail, and a test message and reply worked on 2026-11-17. The live project still needs `npx supabase config push` and a redeploy of `dispatch-email` before it sends from the new address, and the auth sign-up codes need a first delivery from it to confirm. Notification emails (FR-H09) still need a first real delivery to confirm.
 
 ## Notes on how some requirements are met
 
