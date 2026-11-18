@@ -77,6 +77,20 @@ export const businessConfigSchema = z.object({
   currency: z.string().trim().regex(/^[A-Z]{3}$/, 'Use a 3-letter currency code, such as BWP.'),
 });
 
+// A universal sales or expense category, or a subcategory of one.
+export const financeCategorySchema = z.object({
+  code: codeField('Code'),
+  kind: z.enum(['sale', 'expense']),
+  parentCode: z.string().transform((value) => value || null),
+  name: requiredText('Name', 80),
+  description: optionalText(300).transform((value) => value ?? ''),
+  sortOrder: z
+    .string()
+    .trim()
+    .regex(/^\d{1,4}$/, 'Enter a whole number for the position.')
+    .transform(Number),
+});
+
 // FR-I01: a main category of the business taxonomy.
 export const businessCategorySchema = z.object({
   code: codeField('Code'),

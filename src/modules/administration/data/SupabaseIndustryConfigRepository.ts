@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { SupabaseClient } from '@/core/supabase/client';
 import { assertSuccess, nullableNumeric, numeric, parseRow, parseRows } from '@/core/supabase/response';
 
-import type { ActivityTypeConfig, ActivityTypeInput, BusinessCategoryConfig, IndustryConfig, IndustryKpi, KpiDefinition, RecordCategory } from '../domain/models';
+import type { ActivityTypeConfig, ActivityTypeInput, BusinessCategoryConfig, FinanceCategoryConfig, IndustryConfig, IndustryKpi, KpiDefinition, RecordCategory } from '../domain/models';
 import type { IndustryConfigRepository } from '../domain/repositories';
 
 const INDUSTRY_COLUMNS = 'code, category_code, name, short_name, description, icon, chart_title, sort_order, is_active';
@@ -58,7 +58,33 @@ const toCategoryRow = (input: Omit<BusinessCategoryConfig, 'code'>) => ({
   is_active: input.isActive,
 });
 
-const categorySchema = z.object({ id: z.string(), kind: z.enum(['sale', 'expense']), name: z.string() }).transform((row): RecordCategory => row);
+const categorySchema = z
+  .object({ id: z.string(), kind: z.enum(['sale', 'expense']), name: z.string(), finance_category_code: z.string().nullable() })
+  .transform((row): RecordCategory => ({ id: row.id, kind: row.kind, name: row.name, financeCategoryCode: row.finance_category_code }));
+
+const FINANCE_COLUMNS = 'code, kind, parent_code, name, description, sort_order, is_active';
+
+const financeCategorySchema = z
+  .object({ code: z.string(), kind: z.enum(['sale', 'expense']), parent_code: z.string().nullable(), name: z.string(), description: z.string(), sort_order: numeric, is_active: z.boolean() })
+  .transform(
+    (row): FinanceCategoryConfig => ({
+      code: row.code,
+      kind: row.kind,
+      parentCode: row.parent_code,
+      name: row.name,
+      description: row.description,
+      sortOrder: row.sort_order,
+      isActive: row.is_active,
+    }),
+  );
+
+const toFinanceRow = (input: Omit<FinanceCategoryConfig, 'code' | 'kind'>) => ({
+  parent_code: input.parentCode,
+  name: input.name,
+  description: input.description,
+  sort_order: input.sortOrder,
+  is_active: input.isActive,
+});
 
 const ACTIVITY_COLUMNS = 'id, code, name, description, default_unit, uses_flock, allows_negative, min_quantity, max_quantity, whole_numbers_only, notes_required, allowed_units';
 
@@ -131,6 +157,22 @@ export class SupabaseIndustryConfigRepository implements IndustryConfigRepositor
     return this.client.schema('platform');
   }
 
+  async listFinanceCategories(): Promise<FinanceCategoryConfig[]> {
+    return parseRows(financeCategorySchema, await this.db.from('finance_categories').select(FINANCE_COLUMNS).order('sort_order').order('name'));
+  }
+
+  async getFinanceCategory(code: string): Promise<FinanceCategoryConfig> {
+    return parseRow(financeCategorySchema, await this.db.from('finance_categories').select(FINANCE_COLUMNS).eq('code', code).single());
+  }
+
+  async createFinanceCategory(input: FinanceCategoryConfig): Promise<void> {
+    assertSuccess(await this.db.from('finance_categories').insert({ code: input.code, kind: input.kind, ...toFinanceRow(input) }));
+  }
+
+  async updateFinanceCategory(code: string, input: Omit<FinanceCategoryConfig, 'code' | 'kind'>): Promise<void> {
+    assertSuccess(await this.db.from('finance_categories').update(toFinanceRow(input)).eq('code', code));
+  }
+
   async listBusinessCategories(): Promise<BusinessCategoryConfig[]> {
     return parseRows(businessCategorySchema, await this.db.from('business_categories').select(CATEGORY_COLUMNS).order('sort_order'));
   }
@@ -164,11 +206,15 @@ export class SupabaseIndustryConfigRepository implements IndustryConfigRepositor
   }
 
   async listCategories(code: string): Promise<RecordCategory[]> {
-    return parseRows(categorySchema, await this.db.from('record_categories').select('id, kind, name').eq('industry_code', code).order('sort_order'));
+    return parseRows(categorySchema, await this.db.from('record_categories').select('id, kind, name, finance_category_code').eq('industry_code', code).order('sort_order'));
   }
 
-  async addCategory(code: string, kind: 'sale' | 'expense', name: string): Promise<void> {
-    assertSuccess(await this.db.from('record_categories').insert({ industry_code: code, kind, name }));
+  async addCategory(code: string, kind: 'sale' | 'expense', name: string, financeCategoryCode: string | null): Promise<void> {
+    assertSuccess(await this.db.from('record_categories').insert({ industry_code: code, kind, name, finance_category_code: financeCategoryCode }));
+  }
+
+  async setCategoryGroup(id: string, financeCategoryCode: string | null): Promise<void> {
+    assertSuccess(await this.db.from('record_categories').update({ finance_category_code: financeCategoryCode }).eq('id', id));
   }
 
   async removeCategory(id: string): Promise<void> {

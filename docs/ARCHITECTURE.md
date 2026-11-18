@@ -150,7 +150,7 @@ Opening anything from a list shows its profile, read-only, with an Edit button a
 
 `SelectField` and `MultiSelectField` share `OptionSheet`, which adds search for nine or more options. `allowOther` accepts a typed answer, and a value outside the options still displays. Several answers to one question are stored in one text column with `joinChoices` (`core/forms/choices.ts`), so older single answers still read correctly.
 
-A sale, expense or activity keeps one category or type, because a figure counted under two would be counted twice in reports. A category typed under Other joins the list for next time. Filtering can use several categories at once.
+A sale, expense or activity keeps one category or type, because a figure counted under two would be counted twice in reports. A category typed under Other joins the list for next time. Every sale and expense is also reported under one universal category from `platform.finance_categories`, which the database derives from the chosen name (`records.universal_category`) and stores in `category_code`. `records.category_options` lists what a business can choose, with each option's group. Filtering can use several categories at once.
 
 Countries and currencies are plain data in `core/geo/countries.ts`, generated from the MIT-licensed `countries-list` package. A country suggests its currency, and the person can choose another.
 

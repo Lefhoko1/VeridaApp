@@ -135,6 +135,8 @@ export function useIndustryDetailViewModel({ code, categoryCode, onCreated }: { 
 
   const industry = useQuery({ queryKey: detailKey, queryFn: () => industries.getIndustry(code ?? ''), enabled });
   const businessCategories = useQuery({ queryKey: [...scope, 'categories'], queryFn: () => industries.listBusinessCategories() });
+  const financeCategories = useQuery({ queryKey: [...scope, 'finance'], queryFn: () => industries.listFinanceCategories() });
+  const [categoryGroup, setCategoryGroup] = useState('');
   const categories = useQuery({ queryKey: [...detailKey, 'categories'], queryFn: () => industries.listCategories(code ?? ''), enabled });
   const activities = useQuery({ queryKey: [...detailKey, 'activities'], queryFn: () => industries.listActivityTypes(code ?? ''), enabled });
   const kpis = useQuery({ queryKey: [...scope, 'kpis'], queryFn: () => industries.listKpiDefinitions(), enabled });
@@ -175,11 +177,16 @@ export function useIndustryDetailViewModel({ code, categoryCode, onCreated }: { 
     ...report,
   });
   const addCategory = useMutation({
-    mutationFn: (name: string) => industries.addCategory(code ?? '', categoryKind, name),
+    mutationFn: (name: string) => industries.addCategory(code ?? '', categoryKind, name, categoryGroup || null),
     onSuccess: async () => {
       setCategoryName('');
       await refresh();
     },
+    ...report,
+  });
+  const changeCategoryGroup = useMutation({
+    mutationFn: ({ id, group }: { id: string; group: string }) => industries.setCategoryGroup(id, group || null),
+    onSuccess: refresh,
     ...report,
   });
   const removeCategory = useMutation({ mutationFn: (id: string) => industries.removeCategory(id), onSuccess: refresh, ...report });
@@ -234,7 +241,19 @@ export function useIndustryDetailViewModel({ code, categoryCode, onCreated }: { 
       setCategoryError(undefined);
     },
     categoryKind,
-    setCategoryKind,
+    setCategoryKind(kind: 'sale' | 'expense') {
+      setCategoryKind(kind);
+      setCategoryGroup('');
+    },
+    categoryGroup,
+    setCategoryGroup,
+    // The universal categories a type's own category can be reported under, for each kind.
+    groupOptions: (kind: 'sale' | 'expense') =>
+      (financeCategories.data ?? [])
+        .filter((item) => item.kind === kind && item.parentCode === null)
+        .map((item) => ({ value: item.code, label: item.isActive ? item.name : `${item.name} (inactive)` })),
+    groupName: (groupCode: string | null) => (financeCategories.data ?? []).find((item) => item.code === groupCode)?.name ?? 'No group',
+    changeCategoryGroup: (id: string, group: string) => changeCategoryGroup.mutate({ id, group }),
     categoryError,
     submitCategory() {
       const parsed = categoryNameSchema.safeParse(categoryName);

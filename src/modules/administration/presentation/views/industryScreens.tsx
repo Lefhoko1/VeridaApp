@@ -205,9 +205,13 @@ export function IndustryDetailScreen({ code, categoryCode, onCreated }: { code?:
             {vm.categories.length === 0 ? <EmptyState title="No categories yet." /> : null}
             {vm.categories.map((category) => (
               <Row key={category.id}>
-                <Text variant="bodyMedium" style={styles.grow}>
-                  {category.name}
-                </Text>
+                <View style={styles.grow}>
+                  <Text variant="bodyMedium">{category.name}</Text>
+                  <Text style={styles.muted}>Reported under {vm.groupName(category.financeCategoryCode)}</Text>
+                </View>
+                <View style={styles.grow}>
+                  <SelectField label="Group" value={category.financeCategoryCode ?? ''} options={vm.groupOptions(category.kind)} onChange={(value) => vm.changeCategoryGroup(category.id, value)} />
+                </View>
                 <StatusPill label={category.kind} />
                 <IconButton icon="close" size={18} onPress={() => vm.removeCategory(category.id)} accessibilityLabel={`Remove ${category.name}`} />
               </Row>
@@ -220,6 +224,7 @@ export function IndustryDetailScreen({ code, categoryCode, onCreated }: { code?:
                 <SelectField label="Type" value={vm.categoryKind} options={KIND_OPTIONS} onChange={(value) => vm.setCategoryKind(value as 'sale' | 'expense')} />
               </View>
             </Row>
+            <SelectField label="Reported under" value={vm.categoryGroup} options={vm.groupOptions(vm.categoryKind)} onChange={vm.setCategoryGroup} hint="The universal category this one belongs to." />
             <Button mode="outlined" onPress={vm.submitCategory}>
               Add category
             </Button>

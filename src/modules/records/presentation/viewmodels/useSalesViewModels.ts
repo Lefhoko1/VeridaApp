@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { errorMessage } from '@/core/errors/AppError';
 import { toCsv } from '@/core/export/csv';
@@ -10,7 +10,7 @@ import { businessScope } from '@/core/query/queryClient';
 import { useFeedback } from '@/design-system';
 import { useActiveBusiness } from '@/modules/business';
 
-import { saleTotal, type Sale, type SaleInput } from '../../domain/models';
+import { toCategorySelectOptions, saleTotal, type Sale, type SaleInput } from '../../domain/models';
 import { saleFormSchema } from '../../domain/validation';
 import { useRecordsDependencies } from '../di';
 import { useFileLinks, useReceipts } from './useReceipt';
@@ -85,8 +85,9 @@ export function useSaleFormViewModel({ saleId, prefill, onDone }: { saleId?: str
   });
   const categoryOptions = useQuery({
     queryKey: [...businessScope(business.id), 'categories', 'sale'],
-    queryFn: () => categories.list(business.id, 'sale'),
+    queryFn: () => categories.listOptions(business.id, 'sale'),
   });
+  const categoryNames = useMemo(() => categoryOptions.data?.map((option) => option.name), [categoryOptions.data]);
   const productOptions = useQuery({
     queryKey: [...businessScope(business.id), 'products', 'active'],
     queryFn: async () => (await products.list(business.id)).filter((product) => product.isActive),
@@ -99,12 +100,12 @@ export function useSaleFormViewModel({ saleId, prefill, onDone }: { saleId?: str
   const receipt = useReceipts({
     kind: 'sale',
     existingPaths: saleId ? existing.data?.receiptPaths : undefined,
-    categories: categoryOptions.data ?? [],
+    categories: categoryNames ?? [],
     apply(reading) {
       if (reading.occurredOn) setValue('occurredOn', reading.occurredOn);
       const item = reading.description ?? reading.vendor;
       if (item) setValue('itemName', item);
-      const category = categoryOptions.data?.find((name) => name.toLowerCase() === reading.category?.toLowerCase());
+      const category = categoryNames?.find((name) => name.toLowerCase() === reading.category?.toLowerCase());
       if (category) setValue('category', category);
       if (reading.unit) setValue('unit', reading.unit);
       // A receipt often shows only a total: record it as one item at that price.
@@ -116,7 +117,7 @@ export function useSaleFormViewModel({ saleId, prefill, onDone }: { saleId?: str
   });
 
   // Default a new sale to the industry's first category once the options load.
-  const availableCategories = categoryOptions.data;
+  const availableCategories = categoryNames;
   const suggestedCategory = prefill?.category;
   useEffect(() => {
     if (saleId || !availableCategories?.[0]) return;
@@ -136,7 +137,7 @@ export function useSaleFormViewModel({ saleId, prefill, onDone }: { saleId?: str
       if (saleId) await sales.update(saleId, input);
       else await sales.create(business.id, input);
       // A category typed under "Other" joins the list for next time. The sale is saved either way.
-      if (!categoryOptions.data?.includes(input.category)) await categories.add(business.id, 'sale', input.category).catch(() => undefined);
+      if (!categoryNames?.includes(input.category)) await categories.add(business.id, 'sale', input.category).catch(() => undefined);
     },
     onSuccess: () => {
       receipt.commit();
@@ -156,7 +157,7 @@ export function useSaleFormViewModel({ saleId, prefill, onDone }: { saleId?: str
     isVoided,
     voidedReason: existing.data?.voidReason ?? null,
     form,
-    categoryOptions: (categoryOptions.data ?? []).map((value) => ({ value, label: value })),
+    categoryOptions: toCategorySelectOptions(categoryOptions.data),
     productOptions: [
       { value: '', label: 'Not in my catalogue' },
       ...(productOptions.data ?? []).map((product) => ({ value: product.id, label: product.name })),

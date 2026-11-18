@@ -81,10 +81,17 @@ Three later specifications in `requirements/` extend the original: the Business 
 | Phase | Scope | Status |
 | --- | --- | --- |
 | 1a Business categories and types | Taxonomy section 2: ten main categories and their subcategories, stored in `platform.business_categories` and `platform.industries`. Verida staff with Configuration add, rename, reorder and deactivate both under Business types, without app changes. Setup asks for a category, then a type within it, then any other types from any category | Done |
-| 1b Universal sales and expense categories | Taxonomy sections 3 and 4 | Not started |
+| 1b Universal sales and expense categories | Taxonomy sections 3 and 4: nine sales and twelve expense categories, with the expense subcategories, in `platform.finance_categories`. Staff add, rename, reorder and deactivate them under Sales and expense categories. Each business type's own categories are reported under one of them, and every sale and expense stores the universal category it belongs to | Done |
 | 2 Activity catalogue | Activity groups, configurable activity forms, and full activity sets for Poultry and Tuckshop | Not started |
 | 3, 4 Plan module | Goals, tasks, schedule, progress and reviews, then AI planning | Not started |
 | 5 Sales, payments and offline capture | Line items, refunds, payments and offline sync | Not started |
+
+Notes on phase 1b:
+
+- A sale or expense still keeps the name the person chose, so the forms, filters, imports and receipts work as before. The database works out the universal category from that name into `category_code`, which clients cannot write. Existing records were classified the same way, without changing who last edited them.
+- A name is matched first against the universal categories and subcategories, then against the business type's own categories. A category someone typed under Other is reported under Other operating sales or Other business expenses.
+- Forms list the business type's own categories first, then the ones the business typed, then the universal ones, and show each with its group, such as "Feed · Stock and materials".
+- Not yet covered from sections 3 and 4: sale line items, discounts, refunds, payment status, expense status and capital purchases. These belong to phase 5.
 
 Notes on phase 1a:
 

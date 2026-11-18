@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { SupabaseClient } from '@/core/supabase/client';
 import { assertSuccess, numeric, parseRow, parseRows } from '@/core/supabase/response';
 
-import type { CategoryKind, Product, ProductInput } from '../domain/models';
+import type { CategoryKind, CategoryOption, Product, ProductInput } from '../domain/models';
 import type { CategoryRepository, ProductRepository } from '../domain/repositories';
 import { escapeForSearch, LIST_LIMIT } from './query';
 
@@ -83,6 +83,10 @@ export class SupabaseProductRepository implements ProductRepository {
   }
 }
 
+const categoryOptionSchema = z
+  .object({ name: z.string(), group_code: z.string().nullable(), group_name: z.string().nullable() })
+  .transform((row): CategoryOption => ({ name: row.name, groupCode: row.group_code, groupName: row.group_name }));
+
 export class SupabaseCategoryRepository implements CategoryRepository {
   constructor(private readonly client: SupabaseClient) {}
 
@@ -90,6 +94,13 @@ export class SupabaseCategoryRepository implements CategoryRepository {
     return parseRows(
       z.string(),
       await this.client.schema('records').rpc('list_categories', { p_business_id: businessId, p_kind: kind }),
+    );
+  }
+
+  async listOptions(businessId: string, kind: CategoryKind): Promise<CategoryOption[]> {
+    return parseRows(
+      categoryOptionSchema,
+      await this.client.schema('records').rpc('category_options', { p_business_id: businessId, p_kind: kind }),
     );
   }
 

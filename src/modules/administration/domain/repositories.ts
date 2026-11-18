@@ -14,6 +14,7 @@ import type {
   BusinessFilter,
   DeletionRequest,
   BusinessCategoryConfig,
+  FinanceCategoryConfig,
   IndustryConfig,
   IndustryKpi,
   KpiDefinition,
@@ -61,6 +62,10 @@ export interface DeletionRepository {
 }
 
 export interface IndustryConfigRepository {
+  listFinanceCategories(): Promise<FinanceCategoryConfig[]>;
+  getFinanceCategory(code: string): Promise<FinanceCategoryConfig>;
+  createFinanceCategory(input: FinanceCategoryConfig): Promise<void>;
+  updateFinanceCategory(code: string, input: Omit<FinanceCategoryConfig, 'code' | 'kind'>): Promise<void>;
   listBusinessCategories(): Promise<BusinessCategoryConfig[]>;
   getBusinessCategory(code: string): Promise<BusinessCategoryConfig>;
   createBusinessCategory(input: BusinessCategoryConfig): Promise<void>;
@@ -70,7 +75,8 @@ export interface IndustryConfigRepository {
   createIndustry(input: IndustryConfig): Promise<void>;
   updateIndustry(code: string, input: Omit<IndustryConfig, 'code'>): Promise<void>;
   listCategories(code: string): Promise<RecordCategory[]>;
-  addCategory(code: string, kind: 'sale' | 'expense', name: string): Promise<void>;
+  addCategory(code: string, kind: 'sale' | 'expense', name: string, financeCategoryCode: string | null): Promise<void>;
+  setCategoryGroup(id: string, financeCategoryCode: string | null): Promise<void>;
   removeCategory(id: string): Promise<void>;
   listActivityTypes(code: string): Promise<ActivityTypeConfig[]>;
   addActivityType(code: string, input: ActivityTypeInput): Promise<void>;

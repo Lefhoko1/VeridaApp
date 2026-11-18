@@ -59,7 +59,14 @@ function fakeDependencies(): RecordsDependencies {
       setActive: jest.fn(),
       remove: jest.fn(),
     },
-    categories: { list: jest.fn(async () => ['Egg sales', 'Other']), add: jest.fn() },
+    categories: {
+      list: jest.fn(async () => ['Egg sales', 'Other']),
+      listOptions: jest.fn(async () => [
+        { name: 'Egg sales', groupCode: 'product_sales', groupName: 'Product sales' },
+        { name: 'Other', groupCode: null, groupName: null },
+      ]),
+      add: jest.fn(),
+    },
     files: { upload: jest.fn(), linkFor: jest.fn(), linksFor: jest.fn(async () => ({})), remove: jest.fn() },
     receipts: {
       read: jest.fn(async () => ({ occurredOn: '2026-11-02', total: 90, description: 'Egg tray', vendor: null, category: 'egg sales', quantity: 3, unit: null, unitPrice: null })),

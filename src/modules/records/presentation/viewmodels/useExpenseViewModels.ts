@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { errorMessage } from '@/core/errors/AppError';
 import { toCsv } from '@/core/export/csv';
@@ -10,7 +10,7 @@ import { businessScope } from '@/core/query/queryClient';
 import { useFeedback } from '@/design-system';
 import { useActiveBusiness } from '@/modules/business';
 
-import type { Expense, ExpenseInput } from '../../domain/models';
+import { toCategorySelectOptions, type Expense, type ExpenseInput } from '../../domain/models';
 import { expenseFormSchema } from '../../domain/validation';
 import { useRecordsDependencies } from '../di';
 import { useFileLinks, useReceipts } from './useReceipt';
@@ -86,8 +86,9 @@ export function useExpenseFormViewModel({ expenseId, prefill, onDone }: { expens
   });
   const categoryOptions = useQuery({
     queryKey: categoriesKey,
-    queryFn: () => categories.list(business.id, 'expense'),
+    queryFn: () => categories.listOptions(business.id, 'expense'),
   });
+  const categoryNames = useMemo(() => categoryOptions.data?.map((option) => option.name), [categoryOptions.data]);
 
   useEffect(() => {
     if (existing.data) reset(toFormValues(existing.data));
@@ -96,20 +97,20 @@ export function useExpenseFormViewModel({ expenseId, prefill, onDone }: { expens
   const receipt = useReceipts({
     kind: 'expense',
     existingPaths: expenseId ? existing.data?.receiptPaths : undefined,
-    categories: categoryOptions.data ?? [],
+    categories: categoryNames ?? [],
     apply(reading) {
       if (reading.occurredOn) setValue('occurredOn', reading.occurredOn);
       const description = reading.description ?? reading.vendor;
       if (description) setValue('description', description);
       if (reading.total !== null) setValue('amount', String(reading.total));
-      const category = categoryOptions.data?.find((name) => name.toLowerCase() === reading.category?.toLowerCase());
+      const category = categoryNames?.find((name) => name.toLowerCase() === reading.category?.toLowerCase());
       if (category) setValue('category', category);
       if (reading.quantity !== null) setValue('quantity', String(reading.quantity));
       if (reading.unit) setValue('unit', reading.unit);
     },
   });
 
-  const availableCategories = categoryOptions.data;
+  const availableCategories = categoryNames;
   const suggestedCategory = prefill?.category;
   useEffect(() => {
     if (expenseId || !availableCategories?.[0]) return;
@@ -129,7 +130,7 @@ export function useExpenseFormViewModel({ expenseId, prefill, onDone }: { expens
       if (expenseId) await expenses.update(expenseId, input);
       else await expenses.create(business.id, input);
       // A category typed under "Other" joins the list for next time. The expense is saved either way.
-      if (!categoryOptions.data?.includes(input.category)) await categories.add(business.id, 'expense', input.category).catch(() => undefined);
+      if (!categoryNames?.includes(input.category)) await categories.add(business.id, 'expense', input.category).catch(() => undefined);
     },
     onSuccess: () => {
       receipt.commit();
@@ -147,7 +148,7 @@ export function useExpenseFormViewModel({ expenseId, prefill, onDone }: { expens
     isVoided,
     voidedReason: existing.data?.voidReason ?? null,
     form,
-    categoryOptions: (categoryOptions.data ?? []).map((value) => ({ value, label: value })),
+    categoryOptions: toCategorySelectOptions(categoryOptions.data),
     canSave: !isVoided && can(expenseId ? 'records.edit' : 'records.create'),
     saving: save.isPending,
     receipt,

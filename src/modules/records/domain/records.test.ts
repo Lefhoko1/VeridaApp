@@ -1,6 +1,6 @@
 import { rangeStart } from '@/core/time/dateRange';
 
-import { saleTotal } from './models';
+import { categoryOptionLabel, saleTotal, toCategorySelectOptions } from './models';
 import { expenseFormSchema, productFormSchema, saleFormSchema } from './validation';
 
 describe('date filters (FR-C05)', () => {
@@ -95,5 +95,18 @@ describe('product form', () => {
     if (!result.success) {
       expect(result.error.issues.map((issue) => issue.path[0])).toEqual(expect.arrayContaining(['name', 'unit', 'sellingPrice']));
     }
+  });
+});
+
+describe('category labels (Business Taxonomy sections 3 and 4)', () => {
+  it('shows the universal group only when it adds something', () => {
+    expect(categoryOptionLabel({ name: 'Feed', groupCode: 'stock_materials', groupName: 'Stock and materials' })).toBe('Feed · Stock and materials');
+    expect(categoryOptionLabel({ name: 'Stock and materials', groupCode: 'stock_materials', groupName: 'Stock and materials' })).toBe('Stock and materials');
+    expect(categoryOptionLabel({ name: 'Vet visits', groupCode: null, groupName: null })).toBe('Vet visits');
+  });
+
+  it('keeps the name as the stored value', () => {
+    expect(toCategorySelectOptions([{ name: 'Feed', groupCode: 'stock_materials', groupName: 'Stock and materials' }])).toEqual([{ value: 'Feed', label: 'Feed · Stock and materials' }]);
+    expect(toCategorySelectOptions(undefined)).toEqual([]);
   });
 });

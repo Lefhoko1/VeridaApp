@@ -91,7 +91,18 @@ export type IndustryConfig = {
   isActive: boolean;
 };
 
-export type RecordCategory = { id: string; kind: 'sale' | 'expense'; name: string };
+export type RecordCategory = { id: string; kind: 'sale' | 'expense'; name: string; financeCategoryCode: string | null };
+
+// A universal sales or expense category, or a subcategory of one (Business Taxonomy sections 3 and 4).
+export type FinanceCategoryConfig = {
+  code: string;
+  kind: 'sale' | 'expense';
+  parentCode: string | null;
+  name: string;
+  description: string;
+  sortOrder: number;
+  isActive: boolean;
+};
 
 export type ActivityTypeConfig = {
   id: string;

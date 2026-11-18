@@ -321,10 +321,16 @@ describe('records', () => {
     const { client } = await newUser();
     const id = await newBusiness(client);
     const categories = new SupabaseCategoryRepository(client);
-    expect(await categories.list(id, 'expense')).toEqual(['Feed', 'Medication', 'Packaging', 'Transport', 'Other farm costs']);
+    // The business type's own categories come first, then the universal ones.
+    expect((await categories.list(id, 'expense')).slice(0, 5)).toEqual(['Feed', 'Medication', 'Packaging', 'Transport', 'Other farm costs']);
+    expect(await categories.list(id, 'expense')).toContain('Electricity');
     await categories.add(id, 'expense', 'Vet visits');
     expect(await categories.list(id, 'expense')).toContain('Vet visits');
-    expect(await categories.list(id, 'sale')).toEqual(['Egg sales']);
+    expect((await categories.list(id, 'sale'))[0]).toBe('Egg sales');
+
+    const options = await categories.listOptions(id, 'expense');
+    expect(options[0]).toEqual({ name: 'Feed', groupCode: 'stock_materials', groupName: 'Stock and materials' });
+    expect(options.find((option) => option.name === 'Vet visits')).toEqual({ name: 'Vet visits', groupCode: null, groupName: null });
   });
 
   it('never returns another business\'s records', async () => {

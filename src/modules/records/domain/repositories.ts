@@ -1,4 +1,4 @@
-import type { CategoryKind, Expense, ExpenseInput, Product, ProductInput, RecordFilter, Sale, SaleInput } from './models';
+import type { CategoryKind, CategoryOption, Expense, ExpenseInput, Product, ProductInput, RecordFilter, Sale, SaleInput } from './models';
 
 export interface SalesRepository {
   list(businessId: string, filter: RecordFilter): Promise<Sale[]>;
@@ -31,5 +31,6 @@ export interface ProductRepository {
 
 export interface CategoryRepository {
   list(businessId: string, kind: CategoryKind): Promise<string[]>;
+  listOptions(businessId: string, kind: CategoryKind): Promise<CategoryOption[]>;
   add(businessId: string, kind: CategoryKind, name: string): Promise<void>;
 }

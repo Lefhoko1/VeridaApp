@@ -135,9 +135,20 @@ describe('administration', () => {
     await industries.createIndustry({ code, categoryCode, name: 'Fishing', shortName: 'Fish', description: 'Boats', icon: 'fish', chartTitle: 'Catch', sortOrder: 50, isActive: true });
     expect((await industries.getIndustry(code)).name).toBe('Fishing');
 
-    await industries.addCategory(code, 'sale', 'Fresh fish');
+    await industries.addCategory(code, 'sale', 'Fresh fish', 'product_sales');
     const [category] = await industries.listCategories(code);
-    expect(category).toMatchObject({ kind: 'sale', name: 'Fresh fish' });
+    expect(category).toMatchObject({ kind: 'sale', name: 'Fresh fish', financeCategoryCode: 'product_sales' });
+    await industries.setCategoryGroup(category!.id, 'food_beverage_sales');
+    expect((await industries.listCategories(code))[0]).toMatchObject({ financeCategoryCode: 'food_beverage_sales' });
+
+    // Universal sales and expense categories are configuration too.
+    const subcategory = `fishing_nets_${Date.now()}`;
+    await industries.createFinanceCategory({ code: subcategory, kind: 'expense', parentCode: 'equipment_maintenance', name: `Nets ${Date.now()}`, description: '', sortOrder: 9, isActive: true });
+    expect(await industries.getFinanceCategory(subcategory)).toMatchObject({ parentCode: 'equipment_maintenance', kind: 'expense' });
+    const finance = await industries.listFinanceCategories();
+    expect(finance.filter((item) => item.parentCode === null && item.kind === 'sale')).toHaveLength(9);
+    await industries.updateFinanceCategory(subcategory, { parentCode: 'equipment_maintenance', name: 'Fishing nets', description: 'Nets and lines', sortOrder: 9, isActive: false });
+    expect(await industries.getFinanceCategory(subcategory)).toMatchObject({ name: 'Fishing nets', isActive: false });
 
     await industries.addActivityType(code, { code: 'catch', name: 'Catch', description: 'Fish landed', defaultUnit: 'kg', usesFlock: false, allowsNegative: false, minQuantity: null, maxQuantity: 500, wholeNumbersOnly: false, notesRequired: false, allowedUnits: [] });
     const [activity] = await industries.listActivityTypes(code);

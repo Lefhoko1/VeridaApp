@@ -52,10 +52,11 @@ describe('a business with several types', () => {
   });
 
   test('a business sees the categories of all its types, each once', async () => {
-    const list = async (id) => (await as('select records.list_categories($1, $2) as name', [id, 'sale'])).map((row) => row.name);
+    const list = async (id) => (await as('select records.list_categories($1, $2) as name', [id, 'expense'])).map((row) => row.name);
     const mainOnly = await list((await register([])).id);
     const both = await list((await register(['retail'])).id);
     assert.ok(both.length > mainOnly.length);
+    assert.ok(both.includes('Rent') && !mainOnly.includes('Rent'), 'retail adds its own expense categories');
     assert.equal(new Set(both).size, both.length);
     for (const name of mainOnly) assert.ok(both.includes(name), name);
   });
