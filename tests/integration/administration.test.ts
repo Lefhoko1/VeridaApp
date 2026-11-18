@@ -150,10 +150,24 @@ describe('administration', () => {
     await industries.updateFinanceCategory(subcategory, { parentCode: 'equipment_maintenance', name: 'Fishing nets', description: 'Nets and lines', sortOrder: 9, isActive: false });
     expect(await industries.getFinanceCategory(subcategory)).toMatchObject({ name: 'Fishing nets', isActive: false });
 
-    await industries.addActivityType(code, { code: 'catch', name: 'Catch', description: 'Fish landed', defaultUnit: 'kg', usesFlock: false, allowsNegative: false, minQuantity: null, maxQuantity: 500, wholeNumbersOnly: false, notesRequired: false, allowedUnits: [] });
+    await industries.addActivityType(code, { code: 'catch', name: 'Catch', description: 'Fish landed', defaultUnit: 'kg', usesFlock: false, allowsNegative: false, minQuantity: null, maxQuantity: 500, wholeNumbersOnly: false, notesRequired: false, allowedUnits: [], groupCode: 'production_operations', quantityMode: 'required', isActive: true, enabledByDefault: true });
     const [activity] = await industries.listActivityTypes(code);
     expect(activity).toMatchObject({ code: 'catch', maxQuantity: 500 });
-    await industries.updateActivityType(activity!.id, { code: 'catch', name: 'Catch landed', description: 'Fish landed', defaultUnit: 'kg', usesFlock: false, allowsNegative: false, minQuantity: null, maxQuantity: 400, wholeNumbersOnly: false, notesRequired: false, allowedUnits: [] });
+    await industries.updateActivityType(activity!.id, { code: 'catch', name: 'Catch landed', description: 'Fish landed', defaultUnit: 'kg', usesFlock: false, allowsNegative: false, minQuantity: null, maxQuantity: 400, wholeNumbersOnly: false, notesRequired: false, allowedUnits: [], groupCode: 'production_operations', quantityMode: 'required', isActive: true, enabledByDefault: true });
+
+    // Activity groups and form fields are configuration too, and a field change versions the form.
+    expect((await industries.listActivityGroups()).map((group) => group.code)).toContain('production_operations');
+    const groupCode = `fishing_ops_${Date.now()}`;
+    await industries.createActivityGroup({ code: groupCode, name: `Fishing operations ${Date.now()}`, description: '', sortOrder: 20, isActive: true });
+    expect(await industries.getActivityGroup(groupCode)).toMatchObject({ isActive: true, sortOrder: 20 });
+    const before = (await industries.getActivityType(activity!.id)).formVersion;
+    await industries.addActivityField(activity!.id, { code: 'boat', label: 'Boat', help: '', dataType: 'select', isRequired: false, unit: null, options: ['Blue', 'Red'], minValue: null, maxValue: null, sortOrder: 1, isActive: true });
+    const [field] = await industries.listActivityFields(activity!.id);
+    expect(field).toMatchObject({ code: 'boat', dataType: 'select', options: ['Blue', 'Red'] });
+    expect((await industries.getActivityType(activity!.id)).formVersion).toBe(before + 1);
+    await industries.updateActivityField(field!.id, { ...field!, label: 'Boat used' });
+    await industries.removeActivityField(field!.id);
+    expect(await industries.listActivityFields(activity!.id)).toEqual([]);
 
     const kpiCode = `catch_${Date.now()}`;
     await industries.createKpiDefinition({ code: kpiCode, name: 'Catch', explanation: 'Fish landed.', formulaText: 'Sum', requiredData: 'Catch records', unitKind: 'quantity', formula: 'activity_total', activityCode: 'catch' });
@@ -173,7 +187,7 @@ describe('administration', () => {
     const owner = await newUser();
     const boat = await new SupabaseBusinessRepository(owner.client).register({ ...DETAILS, name: 'Boat', industryCode: code });
     const activities = new SupabaseActivityRepository(owner.client);
-    const [type] = await activities.listTypes([code]);
+    const [type] = await activities.listTypes(boat);
     await activities.create(boat, { activityTypeId: type!.id, occurredOn: '2026-10-05', quantity: 100, unit: 'kg', flockId: null, notes: null });
     await expect(activities.create(boat, { activityTypeId: type!.id, occurredOn: '2026-10-05', quantity: 401, unit: 'kg', flockId: null, notes: null })).rejects.toMatchObject({ code: 'validation', message: 'Catch landed cannot be more than 400.' });
 
@@ -469,7 +483,7 @@ describe('bulk record import', () => {
     const owner = await newUser('Date Filter');
     const businessId = await new SupabaseBusinessRepository(owner.client).register({ ...DETAILS, name: 'Filter Farm' });
     const activities = new SupabaseActivityRepository(owner.client);
-    const [type] = await activities.listTypes(['poultry']);
+    const type = (await activities.listTypes(businessId)).find((t) => t.code === 'eggs_collected');
     const row = { activityTypeId: type!.id, quantity: 1, unit: 'eggs', flockId: null, notes: null };
     await activities.createMany(businessId, [{ ...row, occurredOn: '2026-01-05' }, { ...row, occurredOn: '2026-10-05' }]);
     expect(await activities.list(businessId, { from: '2026-06-01' })).toHaveLength(1);

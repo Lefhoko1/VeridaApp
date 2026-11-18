@@ -13,6 +13,10 @@ import type {
   BusinessConfiguration,
   BusinessFilter,
   DeletionRequest,
+  ActivityFieldConfig,
+  ActivityFieldInput,
+  ActivityGroupConfig,
+  ActivityTypeSummary,
   BusinessCategoryConfig,
   FinanceCategoryConfig,
   IndustryConfig,
@@ -62,6 +66,15 @@ export interface DeletionRepository {
 }
 
 export interface IndustryConfigRepository {
+  listActivityGroups(): Promise<ActivityGroupConfig[]>;
+  getActivityGroup(code: string): Promise<ActivityGroupConfig>;
+  createActivityGroup(input: ActivityGroupConfig): Promise<void>;
+  updateActivityGroup(code: string, input: Omit<ActivityGroupConfig, 'code'>): Promise<void>;
+  getActivityType(id: string): Promise<ActivityTypeSummary>;
+  listActivityFields(activityTypeId: string): Promise<ActivityFieldConfig[]>;
+  addActivityField(activityTypeId: string, input: ActivityFieldInput): Promise<void>;
+  updateActivityField(id: string, input: ActivityFieldInput): Promise<void>;
+  removeActivityField(id: string): Promise<void>;
   listFinanceCategories(): Promise<FinanceCategoryConfig[]>;
   getFinanceCategory(code: string): Promise<FinanceCategoryConfig>;
   createFinanceCategory(input: FinanceCategoryConfig): Promise<void>;

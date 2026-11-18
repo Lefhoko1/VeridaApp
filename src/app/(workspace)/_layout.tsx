@@ -12,6 +12,7 @@ const SCREEN_TITLES: Record<string, string> = {
   'expenses/[id]/index': 'Expense',
   'expenses/[id]/edit': 'Edit expense',
   'activities/new': 'New activity',
+  'activities/settings': 'Activities you record',
   'activities/[id]/index': 'Activity',
   'activities/[id]/edit': 'Edit activity',
   'products/index': 'Products and services',

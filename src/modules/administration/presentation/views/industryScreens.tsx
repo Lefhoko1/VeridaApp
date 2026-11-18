@@ -3,7 +3,7 @@ import { Divider, IconButton, List, Switch, Text } from 'react-native-paper';
 
 import { LabelValue, Button, EmptyState, ErrorView, FormField, LoadingView, Notice, Panel, Row, Screen, SectionHeader, SelectField, StatusPill, spacing, supporting } from '@/design-system';
 
-import { KPI_FORMULA_OPTIONS, KPI_UNIT_OPTIONS, YES_NO_OPTIONS } from '../../domain/validation';
+import { KPI_FORMULA_OPTIONS, KPI_UNIT_OPTIONS, QUANTITY_MODE_OPTIONS, YES_NO_OPTIONS } from '../../domain/validation';
 import { useBusinessCategoryViewModel, useIndustryDetailViewModel, useIndustryListViewModel, useKpiFormViewModel } from '../viewmodels/useIndustryViewModels';
 
 const KIND_OPTIONS = [
@@ -139,7 +139,9 @@ export function BusinessCategoryScreen({ code, onCreated, onOpenType }: { code?:
   );
 }
 
-export function IndustryDetailScreen({ code, categoryCode, onCreated }: { code?: string; categoryCode?: string; onCreated: (code: string) => void }) {
+type IndustryDetailProps = { code?: string; categoryCode?: string; onCreated: (code: string) => void; onOpenActivityFields?: (activityTypeId: string) => void };
+
+export function IndustryDetailScreen({ code, categoryCode, onCreated, onOpenActivityFields }: IndustryDetailProps) {
   const vm = useIndustryDetailViewModel({ code, categoryCode, onCreated });
 
   if (vm.loading) return <LoadingView />;
@@ -231,13 +233,16 @@ export function IndustryDetailScreen({ code, categoryCode, onCreated }: { code?:
           </Panel>
 
           <Panel>
-            <SectionHeader title="Activities" description="What this industry records, with its units and validation rules." />
+            <SectionHeader title="Activities" description="What this type records, with its group, quantity rules and form fields. Switched-off ones wait for an owner to turn them on." />
             {vm.activities.map((item) => (
               <Row key={item.id}>
                 <View style={styles.grow}>
                   <Text variant="bodyMedium">{item.name}</Text>
                   <Text style={styles.muted}>
-                    {item.defaultUnit}
+                    {vm.activityGroupName(item.groupCode)}
+                    {item.isActive ? '' : ' · inactive'}
+                    {item.enabledByDefault ? '' : ' · off until an owner turns it on'}
+                    {item.quantityMode === 'none' ? ' · no quantity' : ` · ${item.quantityMode === 'optional' ? 'optional ' : ''}${item.defaultUnit}`}
                     {item.allowedUnits.length > 1 ? ` (or ${item.allowedUnits.filter((unit) => unit !== item.defaultUnit).join(', ')})` : ''}
                     {item.minQuantity !== null ? ` · at least ${item.minQuantity}` : ''}
                     {item.maxQuantity !== null ? ` · at most ${item.maxQuantity}` : ''}
@@ -247,6 +252,7 @@ export function IndustryDetailScreen({ code, categoryCode, onCreated }: { code?:
                     {item.usesFlock ? ' · per flock' : ''}
                   </Text>
                 </View>
+                {onOpenActivityFields ? <IconButton icon="form-select" size={18} onPress={() => onOpenActivityFields(item.id)} accessibilityLabel={`Form fields for ${item.name}`} /> : null}
                 <IconButton icon="pencil-outline" size={18} onPress={() => vm.editActivity(item)} accessibilityLabel={`Edit ${item.name}`} />
                 <IconButton icon="close" size={18} onPress={() => vm.removeActivity(item.id)} accessibilityLabel={`Remove ${item.name}`} />
               </Row>
@@ -256,6 +262,22 @@ export function IndustryDetailScreen({ code, categoryCode, onCreated }: { code?:
             <FormField label="Activity code" value={activity.values.code} onChangeText={(v) => activity.setValue('code', v)} error={activity.errors.code} autoCapitalize="none" disabled={vm.editingActivity} />
             <FormField label="Activity name" value={activity.values.name} onChangeText={(v) => activity.setValue('name', v)} error={activity.errors.name} />
             <FormField label="What to record" value={activity.values.description} onChangeText={(v) => activity.setValue('description', v)} error={activity.errors.description} />
+            <Row gap={spacing.sm}>
+              <View style={styles.grow}>
+                <SelectField label="Group" value={activity.values.groupCode} options={vm.groupOptionsForActivities} onChange={(v) => activity.setValue('groupCode', v)} error={activity.errors.groupCode} />
+              </View>
+              <View style={styles.grow}>
+                <SelectField label="Quantity" value={activity.values.quantityMode} options={QUANTITY_MODE_OPTIONS} onChange={(v) => activity.setValue('quantityMode', v)} />
+              </View>
+            </Row>
+            <Row gap={spacing.sm}>
+              <View style={styles.grow}>
+                <SelectField label="On for new businesses" value={activity.values.enabledByDefault} options={YES_NO_OPTIONS} onChange={(v) => activity.setValue('enabledByDefault', v)} />
+              </View>
+              <View style={styles.grow}>
+                <SelectField label="Active" value={activity.values.isActive} options={YES_NO_OPTIONS} onChange={(v) => activity.setValue('isActive', v)} />
+              </View>
+            </Row>
             <FormField label="Default unit" value={activity.values.defaultUnit} onChangeText={(v) => activity.setValue('defaultUnit', v)} error={activity.errors.defaultUnit} />
             <FormField label="Allowed units, separated by commas (optional)" value={activity.values.allowedUnits} onChangeText={(v) => activity.setValue('allowedUnits', v)} error={activity.errors.allowedUnits} />
             <FormField label="Minimum quantity (optional)" value={activity.values.minQuantity} onChangeText={(v) => activity.setValue('minQuantity', v)} error={activity.errors.minQuantity} keyboardType="numbers-and-punctuation" />

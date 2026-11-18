@@ -82,9 +82,18 @@ Three later specifications in `requirements/` extend the original: the Business 
 | --- | --- | --- |
 | 1a Business categories and types | Taxonomy section 2: ten main categories and their subcategories, stored in `platform.business_categories` and `platform.industries`. Verida staff with Configuration add, rename, reorder and deactivate both under Business types, without app changes. Setup asks for a category, then a type within it, then any other types from any category | Done |
 | 1b Universal sales and expense categories | Taxonomy sections 3 and 4: nine sales and twelve expense categories, with the expense subcategories, in `platform.finance_categories`. Staff add, rename, reorder and deactivate them under Sales and expense categories. Each business type's own categories are reported under one of them, and every sale and expense stores the universal category it belongs to | Done |
-| 2 Activity catalogue | Activity groups, configurable activity forms, and full activity sets for Poultry and Tuckshop | Not started |
+| 2 Activity catalogue | Ten activity groups, activity forms defined as data, an activity lifecycle, links to sales, expenses, products and a responsible person, owners switching activity types on or off, complete Poultry and Tuckshop sets, and the catalogue's activities for every other subcategory | Done |
 | 3, 4 Plan module | Goals, tasks, schedule, progress and reviews, then AI planning | Not started |
 | 5 Sales, payments and offline capture | Line items, refunds, payments and offline sync | Not started |
+
+Notes on phase 2:
+
+- An activity's status is planned, in progress, completed, needs review, cancelled or voided. Only completed activities count in any measure, because every measure already counted only recorded rows, and completed is stored as recorded.
+- Staff define each type's group, whether it records a quantity (needed, optional or not at all), whether new businesses start with it on, and its extra form fields: text, whole numbers, numbers, dates, times, yes or no, and one or several choices from a list. The database checks every answer against those fields, and asks for required answers only when an activity is completed.
+- Changing a type's fields raises its form version, and each record keeps the version it was made with. A field that records already use cannot be deleted, only hidden.
+- Poultry and Tuckshop have complete sets with their fields. 82 other subcategories have the catalogue's 696 activities, each starting as a dated record with a status and notes but no quantity or extra fields, for staff to refine. The catalogue lists none for Other manufacturing and Other care services, so those start with four general ones each, and Other business keeps its three general ones. Each activity's group was assigned by keyword and can be changed on the Business types screen.
+- A link to a sale or expense never copies its amount. The database checks that the linked record and the responsible person belong to the same business.
+- Not yet covered: links to customers, suppliers, assets and payments, which have no records yet, and offline capture (phase 5).
 
 Notes on phase 1b:
 

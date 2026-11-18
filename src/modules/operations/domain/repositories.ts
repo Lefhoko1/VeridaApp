@@ -1,7 +1,10 @@
-import type { ActivityInput, ActivityRecord, ActivityType, Flock, FlockInput } from './models';
+import type { ActivityInput, ActivityRecord, ActivityStatus, ActivityType, Flock, FlockInput } from './models';
 
 export interface ActivityRepository {
-  listTypes(industryCodes: string[]): Promise<ActivityType[]>;
+  // Every type the business's types offer, switched on or off, with its form fields.
+  listTypes(businessId: string): Promise<ActivityType[]>;
+  setTypeEnabled(businessId: string, activityTypeId: string, enabled: boolean): Promise<void>;
+  setStatus(id: string, status: Exclude<ActivityStatus, 'voided'>): Promise<void>;
   list(businessId: string, filter: { search?: string; activityTypeId?: string; from?: string }): Promise<ActivityRecord[]>;
   get(id: string): Promise<ActivityRecord>;
   create(businessId: string, input: ActivityInput): Promise<void>;

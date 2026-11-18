@@ -95,6 +95,8 @@ Each module has its own Postgres schema and its own migration file. A module's t
 
 Industries are data, not code. Each business type (`platform.industries`, a subcategory in the Business Taxonomy) belongs to a main category in `platform.business_categories`. Staff add both on the Business types screen. A new type automatically gets the shared financial KPIs, and its own rows in `record_categories`, `activity_types` and `industry_kpis` add the rest. Forms, categories and dashboards adapt without any app change. Only a genuinely new kind of calculation needs a new `formula` in `analytics.evaluate_kpi`.
 
+Activity types belong to an activity group (`platform.activity_groups`) and can carry extra form fields (`platform.activity_type_fields`), which the app draws as a form and the database checks in `operations.check_activity_details`. `operations.business_activity_types` gives a business everything its forms need, and owners switch types on or off with `operations.set_activity_type_enabled`. An activity's lifecycle lives in `status`, where `recorded` means completed, so every measure, which counts only recorded rows, ignores planned and cancelled work. Activities link to sales, expenses and products through a `RelatedRecordsSource` port that `src/composition` connects to the records module.
+
 ### Where calculations live
 
 KPIs are calculated in SQL, in `analytics`. That gives one source of truth that clients can't alter and that an AI service can later read. Each KPI returns a value, a status (`actual`, `estimated` or `unavailable`) and an explanation, and it refuses to calculate when the data doesn't support it (FR-E15, FR-E16).

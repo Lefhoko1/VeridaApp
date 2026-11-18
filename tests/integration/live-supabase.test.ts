@@ -125,7 +125,7 @@ describeLive('live Supabase project', () => {
     });
 
     it('reads the configurable activity rules', async () => {
-      const [type] = await new SupabaseActivityRepository(one.client).listTypes(['poultry']);
+      const type = (await new SupabaseActivityRepository(one.client).listTypes(farm)).find((t) => t.code === 'eggs_collected');
       expect(type).toMatchObject({ wholeNumbersOnly: false, notesRequired: false, allowedUnits: [] });
     });
 
@@ -211,7 +211,7 @@ describeLive('live Supabase project', () => {
   describe('operations and analytics', () => {
     it('produces the worked example from real records: 48 eggs / 60 hens = 80%', async () => {
       const activities = new SupabaseActivityRepository(one.client);
-      const types = await activities.listTypes(['poultry']);
+      const types = await activities.listTypes(farm);
       const typeId = (code: string) => types.find((t) => t.code === code)!.id;
       const flocks = new SupabaseFlockRepository(one.client);
       await flocks.create(farm, { name: 'LIVE TEST house', breed: null, acquiredOn: '2026-01-15', initialCount: 60 });
@@ -241,7 +241,7 @@ describeLive('live Supabase project', () => {
 
     it('computes expected stock from the latest count', async () => {
       const activities = new SupabaseActivityRepository(two.client);
-      const types = await activities.listTypes(['retail']);
+      const types = await activities.listTypes(shop);
       const typeId = (code: string) => types.find((t) => t.code === code)!.id;
       await activities.create(shop, { activityTypeId: typeId('stock_count'), occurredOn: '2026-10-01', quantity: 500, unit: 'items', flockId: null, notes: null });
       await activities.create(shop, { activityTypeId: typeId('stock_received'), occurredOn: '2026-10-02', quantity: 100, unit: 'items', flockId: null, notes: null });
@@ -252,7 +252,7 @@ describeLive('live Supabase project', () => {
 
     it('rejects an activity from another industry with a readable message', async () => {
       const activities = new SupabaseActivityRepository(one.client);
-      const [retailType] = await activities.listTypes(['retail']);
+      const [retailType] = await new SupabaseActivityRepository(two.client).listTypes(shop);
       await expect(activities.create(farm, { activityTypeId: retailType!.id, occurredOn: '2026-10-05', quantity: 1, unit: 'items', flockId: null, notes: null })).rejects.toMatchObject({
         code: 'validation',
         message: 'This activity is not available for this type of business.',

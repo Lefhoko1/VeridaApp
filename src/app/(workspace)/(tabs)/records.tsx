@@ -31,6 +31,7 @@ export default function RecordsRoute() {
       onImport={() => router.push('/import/activity')}
       onOpen={(id) => router.push({ pathname: '/activities/[id]', params: { id } })}
       onOpenFlocks={() => router.push('/flocks')}
+      onChooseActivities={() => router.push('/activities/settings')}
     />
   );
 }

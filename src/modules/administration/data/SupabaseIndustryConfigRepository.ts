@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { SupabaseClient } from '@/core/supabase/client';
 import { assertSuccess, nullableNumeric, numeric, parseRow, parseRows } from '@/core/supabase/response';
 
-import type { ActivityTypeConfig, ActivityTypeInput, BusinessCategoryConfig, FinanceCategoryConfig, IndustryConfig, IndustryKpi, KpiDefinition, RecordCategory } from '../domain/models';
+import type { ActivityFieldConfig, ActivityFieldInput, ActivityGroupConfig, ActivityTypeConfig, ActivityTypeInput, ActivityTypeSummary, BusinessCategoryConfig, FinanceCategoryConfig, IndustryConfig, IndustryKpi, KpiDefinition, RecordCategory } from '../domain/models';
 import type { IndustryConfigRepository } from '../domain/repositories';
 
 const INDUSTRY_COLUMNS = 'code, category_code, name, short_name, description, icon, chart_title, sort_order, is_active';
@@ -86,10 +86,11 @@ const toFinanceRow = (input: Omit<FinanceCategoryConfig, 'code' | 'kind'>) => ({
   is_active: input.isActive,
 });
 
-const ACTIVITY_COLUMNS = 'id, code, name, description, default_unit, uses_flock, allows_negative, min_quantity, max_quantity, whole_numbers_only, notes_required, allowed_units';
+const ACTIVITY_COLUMNS =
+  'id, code, name, description, default_unit, uses_flock, allows_negative, min_quantity, max_quantity, whole_numbers_only, notes_required, allowed_units, group_code, quantity_mode, is_active, enabled_by_default';
 
 const activitySchema = z
-  .object({ id: z.string(), code: z.string(), name: z.string(), description: z.string(), default_unit: z.string(), uses_flock: z.boolean(), allows_negative: z.boolean(), min_quantity: nullableNumeric, max_quantity: nullableNumeric, whole_numbers_only: z.boolean(), notes_required: z.boolean(), allowed_units: z.array(z.string()) })
+  .object({ id: z.string(), code: z.string(), name: z.string(), description: z.string(), default_unit: z.string(), uses_flock: z.boolean(), allows_negative: z.boolean(), min_quantity: nullableNumeric, max_quantity: nullableNumeric, whole_numbers_only: z.boolean(), notes_required: z.boolean(), allowed_units: z.array(z.string()), group_code: z.string(), quantity_mode: z.enum(['required', 'optional', 'none']), is_active: z.boolean(), enabled_by_default: z.boolean() })
   .transform(
     (row): ActivityTypeConfig => ({
       id: row.id,
@@ -104,8 +105,64 @@ const activitySchema = z
       wholeNumbersOnly: row.whole_numbers_only,
       notesRequired: row.notes_required,
       allowedUnits: row.allowed_units,
+      groupCode: row.group_code,
+      quantityMode: row.quantity_mode,
+      isActive: row.is_active,
+      enabledByDefault: row.enabled_by_default,
     }),
   );
+
+const GROUP_COLUMNS = 'code, name, description, sort_order, is_active';
+const groupSchema = z
+  .object({ code: z.string(), name: z.string(), description: z.string(), sort_order: numeric, is_active: z.boolean() })
+  .transform((row): ActivityGroupConfig => ({ code: row.code, name: row.name, description: row.description, sortOrder: row.sort_order, isActive: row.is_active }));
+
+const FIELD_COLUMNS = 'id, code, label, help, data_type, is_required, unit, options, min_value, max_value, sort_order, is_active';
+const fieldSchema = z
+  .object({
+    id: z.string(),
+    code: z.string(),
+    label: z.string(),
+    help: z.string(),
+    data_type: z.enum(['text', 'integer', 'decimal', 'date', 'time', 'boolean', 'select', 'multi_select']),
+    is_required: z.boolean(),
+    unit: z.string().nullable(),
+    options: z.array(z.string()),
+    min_value: nullableNumeric,
+    max_value: nullableNumeric,
+    sort_order: numeric,
+    is_active: z.boolean(),
+  })
+  .transform(
+    (row): ActivityFieldConfig => ({
+      id: row.id,
+      code: row.code,
+      label: row.label,
+      help: row.help,
+      dataType: row.data_type,
+      isRequired: row.is_required,
+      unit: row.unit,
+      options: row.options,
+      minValue: row.min_value,
+      maxValue: row.max_value,
+      sortOrder: row.sort_order,
+      isActive: row.is_active,
+    }),
+  );
+
+const toFieldRow = (input: ActivityFieldInput) => ({
+  code: input.code,
+  label: input.label,
+  help: input.help,
+  data_type: input.dataType,
+  is_required: input.isRequired,
+  unit: input.unit,
+  options: input.options,
+  min_value: input.minValue,
+  max_value: input.maxValue,
+  sort_order: input.sortOrder,
+  is_active: input.isActive,
+});
 
 const toActivityRow = (input: ActivityTypeInput) => ({
   code: input.code,
@@ -119,6 +176,10 @@ const toActivityRow = (input: ActivityTypeInput) => ({
   whole_numbers_only: input.wholeNumbersOnly,
   notes_required: input.notesRequired,
   allowed_units: input.allowedUnits,
+  group_code: input.groupCode,
+  quantity_mode: input.quantityMode,
+  is_active: input.isActive,
+  enabled_by_default: input.enabledByDefault,
 });
 
 const KPI_COLUMNS = 'code, name, explanation, formula_text, required_data, unit_kind, formula, activity_code';
@@ -155,6 +216,51 @@ export class SupabaseIndustryConfigRepository implements IndustryConfigRepositor
 
   private get db() {
     return this.client.schema('platform');
+  }
+
+  async listActivityGroups(): Promise<ActivityGroupConfig[]> {
+    return parseRows(groupSchema, await this.db.from('activity_groups').select(GROUP_COLUMNS).order('sort_order'));
+  }
+
+  async getActivityGroup(code: string): Promise<ActivityGroupConfig> {
+    return parseRow(groupSchema, await this.db.from('activity_groups').select(GROUP_COLUMNS).eq('code', code).single());
+  }
+
+  async createActivityGroup(input: ActivityGroupConfig): Promise<void> {
+    assertSuccess(
+      await this.db.from('activity_groups').insert({ code: input.code, name: input.name, description: input.description, sort_order: input.sortOrder, is_active: input.isActive }),
+    );
+  }
+
+  async updateActivityGroup(code: string, input: Omit<ActivityGroupConfig, 'code'>): Promise<void> {
+    assertSuccess(
+      await this.db.from('activity_groups').update({ name: input.name, description: input.description, sort_order: input.sortOrder, is_active: input.isActive }).eq('code', code),
+    );
+  }
+
+  async getActivityType(id: string): Promise<ActivityTypeSummary> {
+    return parseRow(
+      z
+        .object({ id: z.string(), industry_code: z.string(), name: z.string(), form_version: numeric })
+        .transform((row): ActivityTypeSummary => ({ id: row.id, industryCode: row.industry_code, name: row.name, formVersion: row.form_version })),
+      await this.db.from('activity_types').select('id, industry_code, name, form_version').eq('id', id).single(),
+    );
+  }
+
+  async listActivityFields(activityTypeId: string): Promise<ActivityFieldConfig[]> {
+    return parseRows(fieldSchema, await this.db.from('activity_type_fields').select(FIELD_COLUMNS).eq('activity_type_id', activityTypeId).order('sort_order'));
+  }
+
+  async addActivityField(activityTypeId: string, input: ActivityFieldInput): Promise<void> {
+    assertSuccess(await this.db.from('activity_type_fields').insert({ activity_type_id: activityTypeId, ...toFieldRow(input) }));
+  }
+
+  async updateActivityField(id: string, input: ActivityFieldInput): Promise<void> {
+    assertSuccess(await this.db.from('activity_type_fields').update(toFieldRow(input)).eq('id', id));
+  }
+
+  async removeActivityField(id: string): Promise<void> {
+    assertSuccess(await this.db.from('activity_type_fields').delete().eq('id', id));
   }
 
   async listFinanceCategories(): Promise<FinanceCategoryConfig[]> {

@@ -6,7 +6,7 @@ import { analyseImport } from '@/core/import/analyseImport';
 import { useCsvImport } from '@/core/import/useCsvImport';
 import { businessScope } from '@/core/query/queryClient';
 import { useFeedback } from '@/design-system';
-import { industriesOf, useActiveBusiness } from '@/modules/business';
+import { useActiveBusiness } from '@/modules/business';
 
 import type { ActivityInput, ActivityType } from '../../domain/models';
 import { activityFormSchema, activityRuleProblem } from '../../domain/validation';
@@ -22,7 +22,19 @@ function importSchema(types: ActivityType[]) {
         context.addIssue({ code: 'custom', message: `"${row.activity}" is not an activity for this business.` });
         return z.NEVER;
       }
-      const parsed = activityFormSchema.safeParse({ activityTypeId: type.id, occurredOn: row.occurredOn, quantity: row.quantity, unit: row.unit || type.defaultUnit, flockId: '', notes: row.notes });
+      const parsed = activityFormSchema.safeParse({
+        activityTypeId: type.id,
+        occurredOn: row.occurredOn,
+        status: 'recorded',
+        quantity: row.quantity,
+        unit: row.unit || type.defaultUnit,
+        flockId: '',
+        notes: row.notes,
+        responsibleUserId: '',
+        saleId: '',
+        expenseId: '',
+        productId: '',
+      });
       if (!parsed.success) {
         context.addIssue({ code: 'custom', message: parsed.error.issues[0]?.message ?? 'This row is not valid.' });
         return z.NEVER;
@@ -32,7 +44,9 @@ function importSchema(types: ActivityType[]) {
         context.addIssue({ code: 'custom', message: problem });
         return z.NEVER;
       }
-      return parsed.data;
+      // An import adds completed records with their quantity, and leaves form answers for later.
+      const { activityTypeId, occurredOn, quantity, unit, flockId, notes } = parsed.data;
+      return { activityTypeId, occurredOn, quantity, unit, flockId, notes, status: 'recorded' };
     });
 }
 
@@ -43,11 +57,12 @@ export function useActivityImportViewModel(onDone: () => void) {
   const queryClient = useQueryClient();
 
   const types = useQuery({
-    queryKey: ['platform', 'activity-types', ...industriesOf(business)],
-    queryFn: () => activities.listTypes(industriesOf(business)),
-    staleTime: Infinity,
+    queryKey: [...businessScope(business.id), 'activity-types'],
+    queryFn: () => activities.listTypes(business.id),
   });
-  const names = (types.data ?? []).map((type) => type.name);
+  // Only activities that measure a quantity and are switched on fit the file's columns.
+  const usable = (types.data ?? []).filter((type) => type.isEnabled && type.quantityMode !== 'none');
+  const names = usable.map((type) => type.name);
 
   const flow = useCsvImport<ActivityInput>({
     analyse: (text) =>
@@ -55,7 +70,7 @@ export function useActivityImportViewModel(onDone: () => void) {
         columns: { date: 'occurredOn', activity: 'activity', quantity: 'quantity', unit: 'unit', notes: 'notes' },
         requiredColumns: ['date', 'activity', 'quantity'],
         defaults: { occurredOn: todayIso() },
-        schema: importSchema(types.data ?? []),
+        schema: importSchema(usable),
       }),
     commit: (rows) => activities.createMany(business.id, rows),
     onCommitted: (count) => {

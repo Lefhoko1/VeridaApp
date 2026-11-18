@@ -3,6 +3,7 @@ import { AttachmentGallery, Button, ConfirmDialog, DetailPanel, ErrorView, Loadi
 
 import { useActivityDetailViewModel } from '../viewmodels/useActivityViewModels';
 import { useFlockDetailViewModel } from '../viewmodels/useFlockViewModels';
+import { activityAmount, STATUS_TONES } from './activityFields';
 
 export function ActivityProfileScreen({ activityId, onEdit }: { activityId: string; onEdit: () => void }) {
   const vm = useActivityDetailViewModel(activityId);
@@ -16,19 +17,38 @@ export function ActivityProfileScreen({ activityId, onEdit }: { activityId: stri
         icon="clipboard-text-outline"
         tone="neutral"
         title={record.activityName}
-        subtitle={formatDate(record.occurredOn)}
-        value={`${formatQuantity(record.quantity)} ${record.unit}`}
+        subtitle={[formatDate(record.occurredOn), vm.groupName].filter(Boolean).join(' · ')}
+        value={activityAmount(record) || undefined}
         struckThrough={vm.isVoided}
-        status={vm.isVoided ? { label: 'Voided', tone: 'danger' } : { label: 'Recorded', tone: 'ok' }}
+        status={{ label: vm.statusLabel, tone: STATUS_TONES[record.status] }}
       />
-      {vm.isVoided ? <Notice title="This record has been voided">{`It no longer counts in your reports. Reason: ${record.voidReason ?? 'not given'}.`}</Notice> : null}
+      {record.status === 'voided' ? <Notice title="This record has been voided">{`It no longer counts in your reports. Reason: ${record.voidReason ?? 'not given'}.`}</Notice> : null}
+      {record.status === 'cancelled' ? <Notice title="This activity was cancelled">It did not happen, so it does not count in your reports.</Notice> : null}
+      {record.status === 'planned' || record.status === 'in_progress' || record.status === 'requires_review' ? (
+        <Notice tone="info">It counts in your reports once it is completed.</Notice>
+      ) : null}
       <DetailPanel
         rows={[
           { label: 'Date', value: formatDate(record.occurredOn), half: true },
           { label: 'Flock', value: vm.flockName, half: true },
+          ...vm.answers.map((answer) => ({ label: answer.label, value: answer.value, half: true })),
+          { label: 'Responsible person', value: vm.responsible, half: true },
+          { label: 'Product or service', value: vm.linkedProduct, half: true },
+          { label: 'Linked sale', value: vm.linkedSale, half: true },
+          { label: 'Linked expense', value: vm.linkedExpense, half: true },
           { label: 'Notes', value: record.notes },
         ]}
       />
+      {vm.canComplete ? (
+        <Button mode="contained" icon="check" onPress={vm.complete} loading={vm.changingStatus} disabled={vm.changingStatus}>
+          Mark as completed
+        </Button>
+      ) : null}
+      {vm.canStart ? (
+        <Button mode="outlined" onPress={vm.start} disabled={vm.changingStatus}>
+          Mark as in progress
+        </Button>
+      ) : null}
       {vm.receipts.length > 0 ? (
         <Panel>
           <AttachmentGallery label="Receipts" files={vm.receipts} />
@@ -42,6 +62,11 @@ export function ActivityProfileScreen({ activityId, onEdit }: { activityId: stri
       {vm.canVoid ? (
         <Button onPress={vm.askToVoid} textColor={supporting.error}>
           Void this record
+        </Button>
+      ) : null}
+      {vm.canCancel ? (
+        <Button onPress={vm.cancel} disabled={vm.changingStatus} textColor={supporting.error}>
+          Cancel this activity
         </Button>
       ) : null}
       <ConfirmDialog

@@ -17,6 +17,8 @@ const SCREEN_TITLES: Record<string, string> = {
   'admin/industries/new': 'New business type',
   'admin/industries/[code]': 'Business type',
   'admin/kpis/new': 'New KPI',
+  'admin/activity-groups': 'Activity groups',
+  'admin/activity-types/[id]': 'Form fields',
   'admin/finance-categories/index': 'Sales and expense categories',
   'admin/finance-categories/new': 'New category',
   'admin/finance-categories/[code]': 'Category',

@@ -131,6 +131,10 @@ export const activityTypeSchema = z
     wholeNumbersOnly: yesNo,
     notesRequired: yesNo,
     allowedUnits: z.string().transform((value) => value.split(',').map((unit) => unit.trim()).filter(Boolean)),
+    groupCode: z.string().min(1, 'Choose a group.'),
+    quantityMode: z.enum(['required', 'optional', 'none']),
+    isActive: yesNo,
+    enabledByDefault: yesNo,
   })
   .refine((rule) => rule.minQuantity === null || rule.maxQuantity === null || rule.minQuantity <= rule.maxQuantity, {
     path: ['minQuantity'],
@@ -139,6 +143,61 @@ export const activityTypeSchema = z
   .refine((rule) => rule.allowedUnits.length === 0 || rule.allowedUnits.some((unit) => unit.toLowerCase() === rule.defaultUnit.toLowerCase()), {
     path: ['allowedUnits'],
     message: 'The default unit must be one of the allowed units.',
+  });
+
+export const QUANTITY_MODE_OPTIONS = [
+  { value: 'required', label: 'Needed when completed' },
+  { value: 'optional', label: 'Optional' },
+  { value: 'none', label: 'Not recorded' },
+];
+
+export const FIELD_TYPE_OPTIONS = [
+  { value: 'text', label: 'Text' },
+  { value: 'integer', label: 'Whole number' },
+  { value: 'decimal', label: 'Number' },
+  { value: 'date', label: 'Date' },
+  { value: 'time', label: 'Time' },
+  { value: 'boolean', label: 'Yes or no' },
+  { value: 'select', label: 'One choice from a list' },
+  { value: 'multi_select', label: 'Several choices from a list' },
+];
+
+const position = z
+  .string()
+  .trim()
+  .regex(/^\d{1,4}$/, 'Enter a whole number for the position.')
+  .transform(Number);
+
+// Activity Catalogue: a group of activity types.
+export const activityGroupSchema = z.object({
+  code: codeField('Code'),
+  name: requiredText('Name', 80),
+  description: optionalText(300).transform((value) => value ?? ''),
+  sortOrder: position,
+});
+
+// Activity Catalogue section 4: one question on an activity's form.
+export const activityFieldSchema = z
+  .object({
+    code: codeField('Field code'),
+    label: requiredText('Question', 80),
+    help: optionalText(200).transform((value) => value ?? ''),
+    dataType: z.enum(['text', 'integer', 'decimal', 'date', 'time', 'boolean', 'select', 'multi_select']),
+    isRequired: yesNo,
+    unit: optionalText(30),
+    options: z.string().transform((value) => value.split(',').map((option) => option.trim()).filter(Boolean)),
+    minValue: optionalNumberField('Smallest value'),
+    maxValue: optionalNumberField('Largest value'),
+    sortOrder: position,
+    isActive: yesNo,
+  })
+  .refine((field) => !['select', 'multi_select'].includes(field.dataType) || field.options.length > 0, {
+    path: ['options'],
+    message: 'List the choices, separated by commas.',
+  })
+  .refine((field) => field.minValue === null || field.maxValue === null || field.minValue <= field.maxValue, {
+    path: ['minValue'],
+    message: 'The smallest value cannot be more than the largest.',
   });
 
 // FR-I06.

@@ -351,8 +351,11 @@ describe('operations and analytics', () => {
     const flocks = new SupabaseFlockRepository(client);
     const analytics = new SupabaseAnalyticsRepository(client);
 
-    const types = await activities.listTypes(['poultry']);
-    expect(types.map((t) => t.code)).toEqual(['eggs_collected', 'eggs_rejected', 'flock_count', 'feed_used', 'health_event']);
+    // The pilot's essentials start switched on, and the rest wait for the owner.
+    const types = await activities.listTypes(id);
+    expect(types.filter((t) => t.isEnabled).map((t) => t.code)).toEqual(['eggs_collected', 'eggs_rejected', 'flock_count', 'feed_used', 'health_event', 'feed_received', 'mortality']);
+    expect(types.find((t) => t.code === 'mortality')).toMatchObject({ groupName: 'Production and operations', quantityMode: 'required' });
+    expect(types.find((t) => t.code === 'mortality')!.fields.map((f) => f.code)).toEqual(['cause']);
     const typeId = (code: string) => types.find((t) => t.code === code)!.id;
 
     await flocks.create(id, { name: 'House A', breed: 'Lohmann', acquiredOn: '2026-01-15', initialCount: 60 });
@@ -367,7 +370,7 @@ describe('operations and analytics', () => {
     await record('feed_used', 7.2, 'kg');
 
     const [latest] = await activities.list(id, { activityTypeId: typeId('feed_used') });
-    expect(latest).toMatchObject({ activityName: 'Feed used', quantity: 7.2, unit: 'kg', flockId: flock!.id });
+    expect(latest).toMatchObject({ activityName: 'Feed consumed', quantity: 7.2, unit: 'kg', flockId: flock!.id });
 
     await new SupabaseSalesRepository(client).create(id, { occurredOn: '2026-10-05', productId: null, itemName: 'Eggs', category: 'Egg sales', quantity: 2, unit: 'trays', unitPrice: 42, notes: null });
     await new SupabaseExpenseRepository(client).create(id, { occurredOn: '2026-10-05', category: 'Feed', description: 'Feed', amount: 34, quantity: null, unit: null, certainty: 'recorded', notes: null });
@@ -403,7 +406,7 @@ describe('operations and analytics', () => {
     const { client } = await newUser();
     const id = await newBusiness(client, { industryCode: 'retail', name: 'Tsholofelo Tuckshop' });
     const activities = new SupabaseActivityRepository(client);
-    const types = await activities.listTypes(['retail']);
+    const types = await activities.listTypes(id);
     const typeId = (code: string) => types.find((t) => t.code === code)!.id;
     const record = (code: string, occurredOn: string, quantity: number) =>
       activities.create(id, { activityTypeId: typeId(code), occurredOn, quantity, unit: 'items', flockId: null, notes: null });
@@ -421,7 +424,8 @@ describe('operations and analytics', () => {
     const { client } = await newUser();
     const id = await newBusiness(client);
     const activities = new SupabaseActivityRepository(client);
-    const [retailType] = await activities.listTypes(['retail']);
+    const shop = await newBusiness(client, { industryCode: 'retail', name: 'Other Shop' });
+    const [retailType] = await activities.listTypes(shop);
     await expect(activities.create(id, { activityTypeId: retailType!.id, occurredOn: '2026-10-05', quantity: 1, unit: 'items', flockId: null, notes: null })).rejects.toMatchObject({
       code: 'validation',
       message: 'This activity is not available for this type of business.',

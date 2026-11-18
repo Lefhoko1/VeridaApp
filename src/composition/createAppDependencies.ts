@@ -8,7 +8,7 @@ import { createAssistantDependencies, createReceiptReader, type BusinessFact, ty
 import { createBusinessDependencies } from '@/modules/business';
 import { createLearningDependencies } from '@/modules/learning';
 import { createNotificationsDependencies } from '@/modules/notifications';
-import { createOperationsDependencies } from '@/modules/operations';
+import { createOperationsDependencies, type RelatedRecordsSource } from '@/modules/operations';
 import { createRecordsDependencies } from '@/modules/records';
 
 const FACT_PERIOD_DAYS = 30;
@@ -51,16 +51,42 @@ function createBusinessFactsProvider(analytics: AnalyticsRepository): BusinessFa
   };
 }
 
+type RecordsDependencies = ReturnType<typeof createRecordsDependencies>;
+type BusinessDependencies = ReturnType<typeof createBusinessDependencies>;
+
+const RELATED_DAYS = 90;
+
+// Connects activities to the records and people they can point to: the only place operations
+// meets records. A link never copies an amount, so the labels name the record only.
+function createRelatedRecordsSource(records: RecordsDependencies, business: BusinessDependencies): RelatedRecordsSource {
+  const from = () => daysBefore(todayIso(), RELATED_DAYS);
+  return {
+    members: async (businessId) => (await business.memberships.listMembers(businessId)).map((m) => ({ id: m.userId, label: m.fullName || m.email })),
+    sales: async (businessId) =>
+      (await records.sales.list(businessId, { from: from() }))
+        .filter((sale) => sale.status === 'recorded')
+        .map((sale) => ({ id: sale.id, label: `${sale.occurredOn} · ${sale.itemName}` })),
+    expenses: async (businessId) =>
+      (await records.expenses.list(businessId, { from: from() }))
+        .filter((expense) => expense.status === 'recorded')
+        .map((expense) => ({ id: expense.id, label: `${expense.occurredOn} · ${expense.description}` })),
+    products: async (businessId) =>
+      (await records.products.list(businessId)).filter((product) => product.isActive).map((product) => ({ id: product.id, label: product.name })),
+  };
+}
+
 export function createAppDependencies(client: SupabaseClient) {
   const analytics = createAnalyticsDependencies(client);
   // Receipts, product photos and logos: one store, shared by the modules that attach files.
   const files = new SupabaseBusinessFileStore(client);
+  const business = createBusinessDependencies(client, files);
+  // Records reads receipts through the assistant's AI service; this is where the two meet.
+  const records = createRecordsDependencies(client, { files, receipts: createReceiptReader(client) });
   return {
     account: createAccountDependencies(client),
-    business: createBusinessDependencies(client, files),
-    // Records reads receipts through the assistant's AI service; this is where the two meet.
-    records: createRecordsDependencies(client, { files, receipts: createReceiptReader(client) }),
-    operations: createOperationsDependencies(client, files),
+    business,
+    records,
+    operations: createOperationsDependencies(client, files, createRelatedRecordsSource(records, business)),
     analytics,
     learning: createLearningDependencies(client),
     assistant: createAssistantDependencies(client, createBusinessFactsProvider(analytics.analytics)),

@@ -13,6 +13,7 @@ export function platformEntries(can: ReturnType<typeof usePlatformAccess>['can']
     can('businesses.manage') && { key: 'businesses', title: 'Businesses', description: 'Search, configure and suspend businesses, and manage their teams', icon: 'domain', href: '/admin/businesses' },
     can('deletions.process') && { key: 'deletions', title: 'Deletion requests', description: 'Retention period, cancelling and erasing', icon: 'delete-clock-outline', href: '/admin/deletions' },
     can('configuration.manage') && { key: 'industries', title: 'Business types', description: 'Categories, types, activities and KPIs', icon: 'tune-variant', href: '/admin/industries' },
+    can('configuration.manage') && { key: 'activity-groups', title: 'Activity groups', description: 'How activity types are grouped', icon: 'shape-plus-outline', href: '/admin/activity-groups' },
     can('configuration.manage') && { key: 'finance-categories', title: 'Sales and expense categories', description: 'The categories every business reports under', icon: 'shape-outline', href: '/admin/finance-categories' },
     can('content.manage') && { key: 'content', title: 'Learning content', description: 'Approved material for lessons', icon: 'book-open-outline', href: '/admin/content' },
     can('roles.manage') && { key: 'roles', title: 'Roles and permissions', description: 'Who can do what', icon: 'shield-account-outline', href: '/admin/roles' },

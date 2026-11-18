@@ -114,7 +114,23 @@ export function useBusinessCategoryViewModel({ code, onCreated }: { code?: strin
   };
 }
 
-const NEW_ACTIVITY = { code: '', name: '', description: '', defaultUnit: '', usesFlock: 'no', allowsNegative: 'no', minQuantity: '', maxQuantity: '', wholeNumbersOnly: 'no', notesRequired: 'no', allowedUnits: '' };
+const NEW_ACTIVITY = {
+  code: '',
+  name: '',
+  description: '',
+  defaultUnit: '',
+  usesFlock: 'no',
+  allowsNegative: 'no',
+  minQuantity: '',
+  maxQuantity: '',
+  wholeNumbersOnly: 'no',
+  notesRequired: 'no',
+  allowedUnits: '',
+  groupCode: 'service_delivery',
+  quantityMode: 'required',
+  isActive: 'yes',
+  enabledByDefault: 'yes',
+};
 
 // FR-I01 to FR-I07.
 export function useIndustryDetailViewModel({ code, categoryCode, onCreated }: { code?: string; categoryCode?: string; onCreated: (code: string) => void }) {
@@ -136,6 +152,7 @@ export function useIndustryDetailViewModel({ code, categoryCode, onCreated }: { 
   const industry = useQuery({ queryKey: detailKey, queryFn: () => industries.getIndustry(code ?? ''), enabled });
   const businessCategories = useQuery({ queryKey: [...scope, 'categories'], queryFn: () => industries.listBusinessCategories() });
   const financeCategories = useQuery({ queryKey: [...scope, 'finance'], queryFn: () => industries.listFinanceCategories() });
+  const activityGroups = useQuery({ queryKey: [...scope, 'activity-groups'], queryFn: () => industries.listActivityGroups() });
   const [categoryGroup, setCategoryGroup] = useState('');
   const categories = useQuery({ queryKey: [...detailKey, 'categories'], queryFn: () => industries.listCategories(code ?? ''), enabled });
   const activities = useQuery({ queryKey: [...detailKey, 'activities'], queryFn: () => industries.listActivityTypes(code ?? ''), enabled });
@@ -263,6 +280,8 @@ export function useIndustryDetailViewModel({ code, categoryCode, onCreated }: { 
     removeCategory: (id: string) => removeCategory.mutate(id),
 
     activities: activities.data ?? [],
+    groupOptionsForActivities: (activityGroups.data ?? []).map((group) => ({ value: group.code, label: group.isActive ? group.name : `${group.name} (inactive)` })),
+    activityGroupName: (code: string) => activityGroups.data?.find((group) => group.code === code)?.name ?? code,
     activityForm,
     editingActivity: editingActivityId !== null,
     editActivity(activity: ActivityTypeConfig) {
@@ -279,6 +298,10 @@ export function useIndustryDetailViewModel({ code, categoryCode, onCreated }: { 
         wholeNumbersOnly: activity.wholeNumbersOnly ? 'yes' : 'no',
         notesRequired: activity.notesRequired ? 'yes' : 'no',
         allowedUnits: activity.allowedUnits.join(', '),
+        groupCode: activity.groupCode,
+        quantityMode: activity.quantityMode,
+        isActive: activity.isActive ? 'yes' : 'no',
+        enabledByDefault: activity.enabledByDefault ? 'yes' : 'no',
       });
     },
     cancelActivityEdit() {

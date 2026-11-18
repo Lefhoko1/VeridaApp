@@ -3,10 +3,12 @@ import { StyleSheet, View } from 'react-native';
 import { Divider, List, Searchbar, Text } from 'react-native-paper';
 
 import { formatDate, formatQuantity } from '@/core/format/format';
+
 import { DATE_RANGE_OPTIONS } from '@/core/time/dateRange';
 import { AttachmentsField, Button, CsvImportScreen, DataTable, DateField, EmptyState, ErrorView, FieldGrid, FormField, LoadingView, Notice, Panel, Row, Screen, SelectField, StatusPill, palette, spacing, supporting, useWideLayout } from '@/design-system';
 
 import { useActivityImportViewModel } from '../viewmodels/useActivityImportViewModel';
+import { ActivityFieldInput, activityAmount, STATUS_TONES } from './activityFields';
 import { useActivityFormViewModel, useActivityListViewModel, type ActivityPrefill } from '../viewmodels/useActivityViewModels';
 import { useFlockFormViewModel, useFlockListViewModel } from '../viewmodels/useFlockViewModels';
 
@@ -34,9 +36,10 @@ type ActivityListProps = {
   onImport: () => void;
   onOpen: (id: string) => void;
   onOpenFlocks: () => void;
+  onChooseActivities?: () => void;
 };
 
-export function ActivityList({ header, onCreate, onImport, onOpen, onOpenFlocks }: ActivityListProps) {
+export function ActivityList({ header, onCreate, onImport, onOpen, onOpenFlocks, onChooseActivities }: ActivityListProps) {
   const vm = useActivityListViewModel();
   const wide = useWideLayout();
   return (
@@ -56,6 +59,11 @@ export function ActivityList({ header, onCreate, onImport, onOpen, onOpenFlocks 
         {vm.canCreate ? (
           <Button mode="outlined" icon="upload" accessibilityLabel="Import CSV" onPress={onImport}>
             Import
+          </Button>
+        ) : null}
+        {vm.canChooseActivities && onChooseActivities ? (
+          <Button mode="outlined" icon="tune-variant" onPress={onChooseActivities}>
+            Choose activities
           </Button>
         ) : null}
       </Row>
@@ -91,7 +99,8 @@ export function ActivityList({ header, onCreate, onImport, onOpen, onOpenFlocks 
               title: 'Quantity',
               align: 'right',
               flex: 1.2,
-              render: (record) => (record.status === 'voided' ? <StatusPill label="Voided" tone="danger" /> : <Text style={styles.quantity}>{`${formatQuantity(record.quantity)} ${record.unit}`}</Text>),
+              render: (record) =>
+                record.status === 'recorded' ? <Text style={styles.quantity}>{activityAmount(record)}</Text> : <StatusPill label={vm.statusLabel(record.status)} tone={STATUS_TONES[record.status]} />,
             },
           ]}
         />
@@ -99,7 +108,7 @@ export function ActivityList({ header, onCreate, onImport, onOpen, onOpenFlocks 
         <Panel style={styles.list}>
           {vm.items.map((record, index) => {
             const flockName = vm.flockNameOf(record.flockId);
-            const voided = record.status === 'voided';
+            const voided = record.status === 'voided' || record.status === 'cancelled';
             return (
               <View key={record.id}>
                 {index > 0 ? <Divider /> : null}
@@ -110,10 +119,8 @@ export function ActivityList({ header, onCreate, onImport, onOpen, onOpenFlocks 
                   onPress={() => onOpen(record.id)}
                   right={() => (
                     <View style={styles.rowEnd}>
-                      <Text style={[styles.quantity, voided && styles.voided]}>
-                        {formatQuantity(record.quantity)} {record.unit}
-                      </Text>
-                      {voided ? <StatusPill label="Voided" tone="danger" /> : null}
+                      <Text style={[styles.quantity, voided && styles.voided]}>{activityAmount(record)}</Text>
+                      {record.status !== 'recorded' ? <StatusPill label={vm.statusLabel(record.status)} tone={STATUS_TONES[record.status]} /> : null}
                     </View>
                   )}
                 />
@@ -134,18 +141,34 @@ export function ActivityFormScreen({ activityId, prefill, onDone }: { activityId
 
   return (
     <Screen variant="form">
-      {vm.isVoided ? <Notice title="This record has been voided">{`It no longer counts in your reports. Reason: ${vm.voidedReason ?? 'not given'}.`}</Notice> : null}
+      {vm.isVoided ? <Notice title="This record is closed">{`It was cancelled or voided and no longer counts in your reports.${vm.voidedReason ? ` Reason: ${vm.voidedReason}.` : ''}`}</Notice> : null}
+      {vm.hasNoTypes ? <Notice tone="info">No activities are switched on for this business. An owner can choose them under Records, Activity.</Notice> : null}
       <Panel>
         <SelectField label="What are you recording?" value={values.activityTypeId} options={vm.typeOptions} onChange={vm.selectType} error={errors.activityTypeId} hint={vm.typeDescription} disabled={vm.isVoided} />
         <FieldGrid>
           <DateField label="Date" value={values.occurredOn} onChangeText={(v) => setValue('occurredOn', v)} error={errors.occurredOn} disabled={vm.isVoided} />
+          <SelectField label="Status" value={values.status} options={vm.statusOptions} onChange={(v) => setValue('status', v as typeof values.status)} error={errors.status} disabled={vm.isVoided} hint="Only completed activities count in your reports." />
           {vm.showFlock ? <SelectField label="Flock" value={values.flockId} options={vm.flockOptions} onChange={(v) => setValue('flockId', v)} disabled={vm.isVoided} /> : null}
-          <Row>
-            <FormField style={styles.grow} label="Quantity" value={values.quantity} onChangeText={(v) => setValue('quantity', v)} error={errors.quantity} keyboardType="numbers-and-punctuation" disabled={vm.isVoided} />
-            <FormField style={styles.grow} label="Unit" value={values.unit} onChangeText={(v) => setValue('unit', v)} error={errors.unit} disabled={vm.isVoided} />
-          </Row>
+          {vm.quantityMode !== 'none' ? (
+            <Row>
+              <FormField style={styles.grow} label={vm.quantityLabel} value={values.quantity} onChangeText={(v) => setValue('quantity', v)} error={errors.quantity} keyboardType="numbers-and-punctuation" disabled={vm.isVoided} />
+              <FormField style={styles.grow} label="Unit" value={values.unit} onChangeText={(v) => setValue('unit', v)} error={errors.unit} disabled={vm.isVoided} />
+            </Row>
+          ) : null}
         </FieldGrid>
+        {vm.fields.map((field) => (
+          <ActivityFieldInput key={field.code} field={field} value={vm.draft[field.code]} error={vm.detailErrors[field.code] || undefined} disabled={vm.isVoided} onChange={(value) => vm.setDetail(field.code, value)} />
+        ))}
         <FormField label="Notes (optional)" value={values.notes} onChangeText={(v) => setValue('notes', v)} error={errors.notes} multiline disabled={vm.isVoided} />
+      </Panel>
+      <Panel>
+        <Text variant="titleSmall">Who and what it relates to (optional)</Text>
+        <FieldGrid>
+          <SelectField label="Responsible person" value={values.responsibleUserId} options={vm.related.members} onChange={(v) => setValue('responsibleUserId', v)} disabled={vm.isVoided} />
+          <SelectField label="Product or service" value={values.productId} options={vm.related.products} onChange={(v) => setValue('productId', v)} disabled={vm.isVoided} />
+          <SelectField label="Linked sale" value={values.saleId} options={vm.related.sales} onChange={(v) => setValue('saleId', v)} disabled={vm.isVoided} hint="The amount stays on the sale." />
+          <SelectField label="Linked expense" value={values.expenseId} options={vm.related.expenses} onChange={(v) => setValue('expenseId', v)} disabled={vm.isVoided} hint="The amount stays on the expense." />
+        </FieldGrid>
       </Panel>
       <Panel>
         <AttachmentsField

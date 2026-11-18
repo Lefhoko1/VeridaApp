@@ -117,9 +117,39 @@ export type ActivityTypeConfig = {
   wholeNumbersOnly: boolean;
   notesRequired: boolean;
   allowedUnits: string[];
+  groupCode: string;
+  quantityMode: 'required' | 'optional' | 'none';
+  isActive: boolean;
+  enabledByDefault: boolean;
 };
 
 export type ActivityTypeInput = Omit<ActivityTypeConfig, 'id'>;
+
+// Activity Catalogue: a group of activity types, such as Stock and inventory.
+export type ActivityGroupConfig = { code: string; name: string; description: string; sortOrder: number; isActive: boolean };
+
+export type ActivityFieldDataType = 'text' | 'integer' | 'decimal' | 'date' | 'time' | 'boolean' | 'select' | 'multi_select';
+
+// One question on an activity type's form (Activity Catalogue section 4).
+export type ActivityFieldConfig = {
+  id: string;
+  code: string;
+  label: string;
+  help: string;
+  dataType: ActivityFieldDataType;
+  isRequired: boolean;
+  unit: string | null;
+  options: string[];
+  minValue: number | null;
+  maxValue: number | null;
+  sortOrder: number;
+  isActive: boolean;
+};
+
+export type ActivityFieldInput = Omit<ActivityFieldConfig, 'id'>;
+
+// One activity type with the facts its field editor needs.
+export type ActivityTypeSummary = { id: string; industryCode: string; name: string; formVersion: number };
 
 export type KpiUnit = 'money' | 'count' | 'percent' | 'grams' | 'quantity';
 
