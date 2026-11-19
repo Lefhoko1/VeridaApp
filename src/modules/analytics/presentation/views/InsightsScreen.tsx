@@ -14,14 +14,21 @@ const KIND: Record<InsightKind, { label: string; icon: string; tone: TileTone }>
   data_quality: { label: 'Data quality', icon: 'database-alert-outline', tone: 'neutral' },
 };
 
-// Plan journey 5.3: from an insight to planned actions. The route decides where that opens.
-export function InsightsScreen({ onPlanAction }: { onPlanAction?: (insight: Insight) => void }) {
+// Plan journey 5.3: from an insight to planned actions. The routes decide where these open.
+type InsightsProps = { onPlanAction?: (insight: Insight) => void; onPlanFromFigures?: () => void };
+
+export function InsightsScreen({ onPlanAction, onPlanFromFigures }: InsightsProps) {
   const vm = useInsightsViewModel();
 
   return (
     <Screen refreshing={vm.refreshing} onRefresh={vm.refresh}>
       <HeroCard kicker="My insights" title="See what your records are telling you." body="Patterns and suggestions, drawn only from what you have entered." />
       <PeriodSelector control={vm.periodControl} />
+      {onPlanFromFigures && vm.canPlan ? (
+        <Button mode="contained" icon="calendar-check-outline" onPress={onPlanFromFigures}>
+          Plan actions from my figures
+        </Button>
+      ) : null}
 
       <Panel>
         <SectionHeader title="Monthly pattern" description="Recorded revenue and expenses by month" />
@@ -49,7 +56,7 @@ export function InsightsScreen({ onPlanAction }: { onPlanAction?: (insight: Insi
               {insight.body}
             </Text>
             <Text style={styles.evidence}>Based on: {insight.evidence}</Text>
-            {onPlanAction && vm.canPlan && insight.id !== 'getting-started' && insight.id !== 'data-readiness' ? (
+            {onPlanAction && vm.canPlan ? (
               <Button compact mode="outlined" icon="calendar-check-outline" onPress={() => onPlanAction(insight)}>
                 Plan an action
               </Button>

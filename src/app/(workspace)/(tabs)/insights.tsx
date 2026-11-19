@@ -11,6 +11,7 @@ export default function InsightsRoute() {
           params: { insightTitle: insight.title, insightBody: insight.body, insightEvidence: insight.evidence, insightKpi: insight.kpiCode ?? '' },
         })
       }
+      onPlanFromFigures={() => router.push({ pathname: '/assist', params: { kind: 'insight_actions' } })}
     />
   );
 }
