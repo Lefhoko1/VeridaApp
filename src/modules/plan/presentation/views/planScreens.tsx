@@ -59,7 +59,7 @@ export type PlanScreenProps = {
 // sections fit a phone.
 function SectionPicker({ value, sections, onChange }: { value: string; sections: readonly { value: string; label: string }[]; onChange: (value: string) => void }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} accessibilityRole="tablist">
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow} contentContainerStyle={styles.chips} accessibilityRole="tablist">
       {sections.map((section) => (
         <Chip key={section.value} selected={value === section.value} showSelectedOverlay onPress={() => onChange(section.value)} accessibilityRole="tab" accessibilityState={{ selected: value === section.value }}>
           {section.label}
@@ -710,5 +710,7 @@ const styles = StyleSheet.create({
   done: { color: supporting.mutedText },
   rowEnd: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   search: { backgroundColor: 'transparent' },
-  chips: { gap: spacing.xs, paddingVertical: spacing.xs },
+  // The row keeps its natural height, and chips keep theirs, on a wide web window too.
+  chipRow: { flexGrow: 0, flexShrink: 0 },
+  chips: { gap: spacing.xs, paddingVertical: spacing.xs, alignItems: 'center' },
 });
