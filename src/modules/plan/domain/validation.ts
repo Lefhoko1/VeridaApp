@@ -9,6 +9,19 @@ const optionalDate = z
 
 const emptyToNull = (value: string) => (value === '' ? null : value);
 
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+const optionalTime = z
+  .string()
+  .trim()
+  .refine((value) => value === '' || TIME.test(value), 'Enter a time as HH:MM, such as 08:30.')
+  .transform((value) => (value === '' ? null : value));
+
+// Section 4.4: how a task repeats. Kept as strings while the form is open.
+export const ruleFields = {
+  defaults: { repeat: 'none', intervalCount: '1', daysOfWeek: '', dayOfMonth: '', startsOn: '', endsOn: '' },
+};
+
 // Section 4.3 and journey 5.1: a title is enough, and the rest is asked for progressively.
 export const taskFormSchema = z
   .object({
@@ -22,11 +35,88 @@ export const taskFormSchema = z
     assignedTo: z.string().transform(emptyToNull),
     // Several goals, held as one comma-separated value while the form is open.
     goalIds: z.string().transform((value) => value.split(',').filter(Boolean)),
+    repeat: z.enum(['none', 'daily', 'weekly', 'monthly']),
+    intervalCount: z.string().trim(),
+    daysOfWeek: z.string().transform((value) => value.split(',').filter(Boolean).map(Number)),
+    dayOfMonth: z.string().trim(),
+    startsOn: optionalDate,
+    endsOn: optionalDate,
   })
-  .refine((task) => task.status !== 'blocked' || Boolean(task.blockerReason), {
-    path: ['blockerReason'],
-    message: 'Say what is blocking the task.',
+  .superRefine((task, context) => {
+    if (task.status === 'blocked' && !task.blockerReason) {
+      context.addIssue({ code: 'custom', path: ['blockerReason'], message: 'Say what is blocking the task.' });
+    }
+    if (task.repeat === 'none') return;
+    const every = Number(task.intervalCount);
+    if (!Number.isInteger(every) || every < 1 || every > 52) {
+      context.addIssue({ code: 'custom', path: ['intervalCount'], message: 'Enter a whole number from 1 to 52.' });
+    }
+    if (task.repeat === 'weekly' && task.daysOfWeek.length === 0) {
+      context.addIssue({ code: 'custom', path: ['daysOfWeek'], message: 'Choose at least one day.' });
+    }
+    const day = Number(task.dayOfMonth);
+    if (task.repeat === 'monthly' && (!Number.isInteger(day) || day < 1 || day > 31)) {
+      context.addIssue({ code: 'custom', path: ['dayOfMonth'], message: 'Enter a day from 1 to 31.' });
+    }
+    if (!task.startsOn) {
+      context.addIssue({ code: 'custom', path: ['startsOn'], message: 'Choose when it starts.' });
+    } else if (task.endsOn && task.endsOn < task.startsOn) {
+      context.addIssue({ code: 'custom', path: ['endsOn'], message: 'The end cannot be before the start.' });
+    }
+  })
+  .transform((task) => ({
+    ...task,
+    intervalCount: Number(task.intervalCount) || 1,
+    dayOfMonth: task.repeat === 'monthly' ? Number(task.dayOfMonth) : null,
+  }));
+
+// Editing a series changes what each later occurrence looks like, and when it stops.
+export const ruleUpdateSchema = z
+  .object({
+    title: requiredText('Task', 160),
+    description: optionalText(2000),
+    priority: z.enum(['low', 'normal', 'high', 'urgent']),
+    assignedTo: z.string().transform(emptyToNull),
+    endsOn: optionalDate,
+    startsOn: z.string(),
+  })
+  .refine((rule) => !rule.endsOn || rule.endsOn >= rule.startsOn, { path: ['endsOn'], message: 'The end cannot be before the start.' });
+
+// Entity PLAN_EVENT: a day, with optional local start and end times.
+export const eventFormSchema = z
+  .object({
+    title: requiredText('Event', 160),
+    description: optionalText(2000),
+    eventType: z.enum(['meeting', 'delivery', 'appointment', 'deadline', 'other']),
+    startsOn: dateField,
+    startTime: optionalTime,
+    endTime: optionalTime,
+    status: z.enum(['scheduled', 'done', 'cancelled']),
+  })
+  .superRefine((event, context) => {
+    if (event.endTime && !event.startTime) {
+      context.addIssue({ code: 'custom', path: ['startTime'], message: 'Add a start time, or leave both empty for all day.' });
+    } else if (event.endTime && event.startTime && event.endTime <= event.startTime) {
+      context.addIssue({ code: 'custom', path: ['endTime'], message: 'The end must be after the start.' });
+    }
   });
+
+export const reminderFormSchema = z.object({
+  on: dateField,
+  at: z
+    .string()
+    .trim()
+    .refine((value) => TIME.test(value), 'Enter a time as HH:MM, such as 08:30.'),
+});
+
+export const commentFormSchema = z.object({ body: requiredText('Comment', 1000) });
+
+export const reviewFormSchema = z.object({
+  summary: optionalText(2000),
+  wins: optionalText(2000),
+  blockers: optionalText(2000),
+  nextPriorities: optionalText(2000),
+});
 
 // Section 4.2: measurable goals need a direction and target; milestone goals use neither.
 export const goalFormSchema = z

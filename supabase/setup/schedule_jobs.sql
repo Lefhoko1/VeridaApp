@@ -21,3 +21,20 @@ select cron.schedule(
   '0 7 * * *',
   $$ select notifications.send_learning_reminders() $$
 );
+
+-- Plan section 9: send task reminders that have come due, every five minutes. Each reminder is
+-- claimed once, so overlapping runs never send it twice.
+select cron.schedule(
+  'verida-plan-reminders',
+  '*/5 * * * *',
+  $$ select plan.send_due_reminders() $$
+);
+
+-- Plan section 4.4: turn the next week of each repeating task into tasks, nightly at 00:10 UTC.
+-- Opening the Plan tab does the same, so this only keeps reminders and counts current for
+-- businesses nobody has opened. Running it twice never creates a task twice.
+select cron.schedule(
+  'verida-plan-occurrences',
+  '10 0 * * *',
+  $$ select plan.generate_all_occurrences() $$
+);

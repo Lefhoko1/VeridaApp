@@ -9,3 +9,4 @@ export function createPlanDependencies(client: SupabaseClient): PlanDependencies
 
 export { PlanDependenciesProvider } from './presentation/di';
 export { GoalFormScreen, GoalProfileScreen, PlanScreen, TaskFormScreen, TaskProfileScreen } from './presentation/views/planScreens';
+export { EventFormScreen, EventProfileScreen, ReviewFormScreen, ReviewScreen, SeriesFormScreen, SeriesProfileScreen } from './presentation/views/scheduleScreens';

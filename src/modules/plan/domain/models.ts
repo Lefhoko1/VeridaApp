@@ -28,6 +28,11 @@ export type Task = {
   version: number;
   createdAt: string;
   goalIds: string[];
+  // The business-local day it was completed, set by the database.
+  completedOn: string | null;
+  // Set when the task is one occurrence of a repeating series.
+  ruleId: string | null;
+  occurrenceOn: string | null;
 };
 
 export type TaskInput = {
@@ -118,6 +123,9 @@ export type Milestone = {
 };
 
 export type ProgressEntry = { recordedOn: string; actualValue: number; note: string | null };
+
+// Section 4.2: a dated observation, with who recorded it.
+export type ProgressObservation = ProgressEntry & { id: string; createdAt: string; createdBy: string | null };
 
 export type PlanOverview = {
   today: string;

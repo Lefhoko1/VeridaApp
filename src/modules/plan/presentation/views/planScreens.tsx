@@ -1,6 +1,5 @@
-import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { Checkbox, Divider, IconButton, List, Searchbar, SegmentedButtons, Text } from 'react-native-paper';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { Checkbox, Chip, Divider, IconButton, List, Searchbar, Text, TextInput } from 'react-native-paper';
 
 import { formatDate, formatQuantity } from '@/core/format/format';
 import {
@@ -27,10 +26,9 @@ import {
   StatusPill,
   spacing,
   supporting,
-  type StatusTone,
 } from '@/design-system';
 
-import type { GoalStatus, TaskPriority, TaskStatus } from '../../domain/models';
+import type { TaskPriority, TaskStatus } from '../../domain/models';
 import {
   useGoalDetailViewModel,
   useGoalFormViewModel,
@@ -38,110 +36,63 @@ import {
   usePlanOverviewViewModel,
   useTaskDetailViewModel,
   useTaskFormViewModel,
+  usePlanSectionsViewModel,
   useTaskListViewModel,
+  type PlanSection,
 } from '../viewmodels/usePlanViewModels';
+import { GOAL_TONES, GoalCards, TASK_TONES, TaskRows, formatDateTime } from './planParts';
+import { ProgressSection, ScheduleSection } from './scheduleScreens';
 
-const PRIORITY_TONES: Record<TaskPriority, StatusTone> = { urgent: 'danger', high: 'warn', normal: 'neutral', low: 'neutral' };
-const TASK_TONES: Record<TaskStatus, StatusTone> = { not_started: 'neutral', in_progress: 'warn', blocked: 'danger', completed: 'ok', cancelled: 'neutral' };
-const GOAL_TONES: Record<GoalStatus, StatusTone> = { active: 'ok', on_hold: 'neutral', at_risk: 'warn', completed: 'ok', cancelled: 'neutral', expired: 'neutral' };
-
-type TaskRowData = {
-  id: string;
-  title: string;
-  priority: TaskPriority;
-  priorityLabel: string;
-  status: TaskStatus;
-  statusLabel: string;
-  dueOn: string | null;
-  overdue: boolean;
-  dueToday: boolean;
-  assignee: string | null;
-};
-
-function TaskRows({ items, onOpen, empty }: { items: TaskRowData[]; onOpen: (id: string) => void; empty: string }) {
-  if (items.length === 0) return <Text style={styles.muted}>{empty}</Text>;
-  return (
-    <>
-      {items.map((task, index) => (
-        <View key={task.id}>
-          {index > 0 ? <Divider /> : null}
-          <List.Item
-            title={task.title}
-            titleStyle={task.status === 'cancelled' ? styles.struck : undefined}
-            description={[task.overdue ? `Overdue, due ${formatDate(task.dueOn ?? '')}` : task.dueToday ? 'Due today' : task.dueOn ? `Due ${formatDate(task.dueOn)}` : null, task.assignee]
-              .filter(Boolean)
-              .join(' · ')}
-            descriptionStyle={task.overdue ? styles.overdue : undefined}
-            onPress={() => onOpen(task.id)}
-            right={() => (
-              <View style={styles.rowEnd}>
-                {task.priority === 'urgent' || task.priority === 'high' ? <StatusPill label={task.priorityLabel} tone={PRIORITY_TONES[task.priority]} /> : null}
-                {task.status !== 'not_started' ? <StatusPill label={task.statusLabel} tone={TASK_TONES[task.status]} /> : null}
-              </View>
-            )}
-          />
-        </View>
-      ))}
-    </>
-  );
-}
-
-type GoalCardData = { id: string; title: string; status: GoalStatus; statusLabel: string; summary: string; ratio: number | null; targetOn: string | null };
-
-function GoalCards({ items, onOpen }: { items: GoalCardData[]; onOpen: (id: string) => void }) {
-  return (
-    <>
-      {items.map((goal, index) => (
-        <View key={goal.id}>
-          {index > 0 ? <Divider /> : null}
-          <List.Item
-            title={goal.title}
-            description={[goal.summary, goal.targetOn ? `by ${formatDate(goal.targetOn)}` : null].filter(Boolean).join(' · ')}
-            descriptionNumberOfLines={2}
-            onPress={() => onOpen(goal.id)}
-            right={() => (goal.status !== 'active' ? <StatusPill label={goal.statusLabel} tone={GOAL_TONES[goal.status]} /> : null)}
-          />
-          {goal.ratio !== null ? <BarRow label="" ratio={goal.ratio} value="" /> : null}
-        </View>
-      ))}
-    </>
-  );
-}
-
-const SECTIONS = [
-  { value: 'overview', label: 'Overview' },
-  { value: 'goals', label: 'Goals' },
-  { value: 'tasks', label: 'Tasks' },
-];
-
-type PlanScreenProps = {
+export type PlanScreenProps = {
+  initialSection?: PlanSection;
   onNewTask: () => void;
   onNewGoal: () => void;
+  onNewEvent: (onDate?: string) => void;
   onOpenTask: (id: string) => void;
   onOpenGoal: (id: string) => void;
+  onOpenEvent: (id: string) => void;
+  onOpenSeries: (id: string) => void;
+  onOpenReview: (weekStart: string) => void;
 };
+
+// Section 1.2: Overview, Goals, Tasks, Schedule and Progress. Chips scroll sideways, so five
+// sections fit a phone.
+function SectionPicker({ value, sections, onChange }: { value: string; sections: readonly { value: string; label: string }[]; onChange: (value: string) => void }) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} accessibilityRole="tablist">
+      {sections.map((section) => (
+        <Chip key={section.value} selected={value === section.value} showSelectedOverlay onPress={() => onChange(section.value)} accessibilityRole="tab" accessibilityState={{ selected: value === section.value }}>
+          {section.label}
+        </Chip>
+      ))}
+    </ScrollView>
+  );
+}
 
 // Section 1: the Business Planning & Action Centre.
 export function PlanScreen(props: PlanScreenProps) {
-  const [section, setSection] = useState('overview');
-  const header = <SegmentedButtons value={section} onValueChange={setSection} buttons={SECTIONS} />;
-  if (section === 'goals') return <GoalList header={header} {...props} />;
-  if (section === 'tasks') return <TaskList header={header} {...props} />;
-  return <PlanOverview header={header} {...props} />;
+  const vm = usePlanSectionsViewModel(props.initialSection);
+  const header = <SectionPicker value={vm.section} sections={vm.sections} onChange={vm.setSection} />;
+  switch (vm.section) {
+    case 'goals':
+      return <GoalList header={header} {...props} />;
+    case 'tasks':
+      return <TaskList header={header} {...props} />;
+    case 'schedule':
+      return <ScheduleSection header={header} {...props} />;
+    case 'progress':
+      return <ProgressSection header={header} {...props} />;
+    default:
+      return <PlanOverview header={header} onShowSchedule={() => vm.setSection('schedule')} {...props} />;
+  }
 }
 
-const PERIODS = [
-  { value: 'week', label: 'Last 7 days' },
-  { value: 'month', label: 'Last 30 days' },
-];
-
-function PlanOverview({ header, onNewTask, onNewGoal, onOpenTask, onOpenGoal }: PlanScreenProps & { header: React.ReactNode }) {
+function PlanOverview({ header, onNewTask, onNewGoal, onOpenTask, onOpenGoal, onOpenEvent, onShowSchedule }: PlanScreenProps & { header: React.ReactNode; onShowSchedule: () => void }) {
   const vm = usePlanOverviewViewModel();
   if (!vm.canView) return <Screen>{header}<Notice tone="info">You do not have access to this business&apos;s plan.</Notice></Screen>;
   if (vm.loading) return <Screen>{header}<LoadingView /></Screen>;
   if (vm.error) return <Screen>{header}<ErrorView message={vm.error} onRetry={vm.retry} /></Screen>;
   const n = vm.numbers;
-  const rate = (value: number | null | undefined) => (value === null || value === undefined ? 'No data' : `${value}%`);
 
   return (
     <Screen>
@@ -161,7 +112,7 @@ function PlanOverview({ header, onNewTask, onNewGoal, onOpenTask, onOpenGoal }: 
       <MetricGrid>
         <MetricCard index={0} label="Open tasks" value={formatQuantity(n?.openTasks ?? 0)} />
         <MetricCard index={1} label="Active goals" value={formatQuantity(n?.activeGoals ?? 0)} />
-        <MetricCard index={2} label="Completed" value={formatQuantity(n?.completedInPeriod ?? 0)} caption={vm.period === 'week' ? 'Last 7 days' : 'Last 30 days'} />
+        <MetricCard index={2} label="Completed" value={formatQuantity(n?.completedInPeriod ?? 0)} caption="Last 7 days" />
         <MetricCard
           index={3}
           label="Overdue or blocked"
@@ -181,22 +132,25 @@ function PlanOverview({ header, onNewTask, onNewGoal, onOpenTask, onOpenGoal }: 
       </Panel>
 
       <Panel style={styles.list}>
-        <SectionHeader title="Coming up" description="Due in the next 7 days." />
-        <TaskRows items={vm.upcoming} onOpen={onOpenTask} empty="Nothing due this week." />
-      </Panel>
-
-      <Panel>
-        <SectionHeader title="Progress" description="How the team kept its commitments. This does not show whether business figures improved." />
-        <SelectField label="Period" value={vm.period} options={PERIODS} onChange={vm.setPeriod} />
-        <DetailPanel
-          rows={[
-            { label: 'Tasks due in the period', value: formatQuantity(n?.eligibleDue ?? 0), half: true },
-            { label: 'Completion rate', value: rate(n?.completionRate), half: true },
-            { label: 'Completed on time', value: rate(n?.onTimeRate), half: true },
-            { label: 'Blocked now', value: formatQuantity(n?.blockedTasks ?? 0), half: true },
-          ]}
+        <SectionHeader
+          title="Coming up"
+          description="Due in the next 7 days."
+          action={
+            <Button compact icon="calendar-month-outline" onPress={onShowSchedule}>
+              View schedule
+            </Button>
+          }
         />
-        <Text style={styles.muted}>Cancelled tasks are left out. A rescheduled task counts on its current due date.</Text>
+        {vm.events.map((event) => (
+          <List.Item
+            key={event.id}
+            title={event.title}
+            description={`${formatDate(event.onDate)} · ${event.when} · ${event.typeLabel}`}
+            left={(p) => <List.Icon {...p} icon="calendar-clock-outline" />}
+            onPress={() => onOpenEvent(event.id)}
+          />
+        ))}
+        <TaskRows items={vm.upcoming} onOpen={onOpenTask} empty={vm.events.length > 0 ? '' : 'Nothing due this week.'} />
       </Panel>
     </Screen>
   );
@@ -270,8 +224,10 @@ function GoalList({ header, onNewGoal, onOpenGoal }: PlanScreenProps & { header:
   );
 }
 
-export function TaskFormScreen({ taskId, goalId, onDone }: { taskId?: string; goalId?: string; onDone: (id: string) => void }) {
-  const vm = useTaskFormViewModel({ taskId, goalId, onDone });
+type TaskFormProps = { taskId?: string; goalId?: string; onDone: (id: string) => void; onSeriesCreated?: (ruleId: string) => void };
+
+export function TaskFormScreen({ taskId, goalId, onDone, onSeriesCreated }: TaskFormProps) {
+  const vm = useTaskFormViewModel({ taskId, goalId, onDone, onSeriesCreated });
   if (vm.loading) return <LoadingView />;
   if (vm.loadError) return <ErrorView message={vm.loadError} />;
   const { values, errors, setValue } = vm.form;
@@ -280,35 +236,74 @@ export function TaskFormScreen({ taskId, goalId, onDone }: { taskId?: string; go
     <Screen variant="form">
       <Panel>
         <FormField label="What needs doing?" value={values.title} onChangeText={(v) => setValue('title', v)} error={errors.title} />
+        {vm.isOccurrence ? <Notice tone="info">{`This task repeats: ${vm.seriesSummary ?? ''}.`}</Notice> : null}
+        {vm.canRepeat ? <SelectField label="Repeats" value={values.repeat} options={vm.repeatOptions} onChange={vm.setRepeat} /> : null}
+        {vm.repeating ? (
+          <>
+            <FieldGrid>
+              <DateField label="Starts on" value={values.startsOn} onChangeText={(v) => setValue('startsOn', v)} error={errors.startsOn} />
+              <DateField label="Ends on (optional)" value={values.endsOn} onChangeText={(v) => setValue('endsOn', v)} error={errors.endsOn} />
+              <FormField
+                label={values.repeat === 'daily' ? 'Every how many days' : values.repeat === 'weekly' ? 'Every how many weeks' : 'Every how many months'}
+                value={values.intervalCount}
+                onChangeText={(v) => setValue('intervalCount', v)}
+                error={errors.intervalCount}
+                keyboardType="number-pad"
+              />
+              {values.repeat === 'monthly' ? (
+                <FormField label="Day of the month" value={values.dayOfMonth} onChangeText={(v) => setValue('dayOfMonth', v)} error={errors.dayOfMonth} keyboardType="number-pad" hint="A short month uses its last day." />
+              ) : null}
+            </FieldGrid>
+            {values.repeat === 'weekly' ? (
+              <MultiSelectField label="On these days" values={vm.chosenWeekdays} options={vm.weekdayOptions} onChange={vm.setWeekdays} allowOther={false} allLabel="" emptyText="Choose days" error={errors.daysOfWeek} />
+            ) : null}
+            {vm.repeatSummary ? <Text style={styles.muted}>{`${vm.repeatSummary}. Each time becomes its own task, about a week ahead.`}</Text> : null}
+          </>
+        ) : null}
         <FieldGrid>
-          <DateField label="Due date (optional)" value={values.dueOn} onChangeText={(v) => setValue('dueOn', v)} error={errors.dueOn} />
+          {vm.repeating ? null : <DateField label="Due date (optional)" value={values.dueOn} onChangeText={(v) => setValue('dueOn', v)} error={errors.dueOn} />}
           <SelectField label="Priority" value={values.priority} options={vm.priorityOptions} onChange={(v) => setValue('priority', v as TaskPriority)} />
           <SelectField label="Assigned to" value={values.assignedTo} options={vm.assigneeOptions} onChange={(v) => setValue('assignedTo', v)} />
           {vm.isEditing ? <SelectField label="Status" value={values.status} options={vm.statusOptions} onChange={(v) => setValue('status', v as TaskStatus)} /> : null}
         </FieldGrid>
         {values.status === 'blocked' ? <FormField label="What is blocking it?" value={values.blockerReason} onChangeText={(v) => setValue('blockerReason', v)} error={errors.blockerReason} /> : null}
         {values.status === 'completed' ? <FormField label="Completion note (optional)" value={values.completionNote} onChangeText={(v) => setValue('completionNote', v)} error={errors.completionNote} /> : null}
-        <MultiSelectField
-          label="Goals it supports (optional)"
-          values={vm.chosenGoals}
-          options={vm.goalOptions}
-          onChange={vm.setGoals}
-          allowOther={false}
-          allLabel=""
-          emptyText="No goal"
-        />
+        {vm.repeating ? null : (
+          <MultiSelectField
+            label="Goals it supports (optional)"
+            values={vm.chosenGoals}
+            options={vm.goalOptions}
+            onChange={vm.setGoals}
+            allowOther={false}
+            allLabel=""
+            emptyText="No goal"
+          />
+        )}
         <FormField label="Details (optional)" value={values.description} onChangeText={(v) => setValue('description', v)} error={errors.description} multiline />
       </Panel>
+      {vm.isOccurrence && vm.seriesActive ? (
+        <Panel>
+          <SelectField
+            label="Apply the title, priority, person and details to"
+            value={vm.editScope}
+            options={vm.scopeOptions}
+            onChange={vm.setEditScope}
+            hint="Status, due date and goals always change for this task only. Past tasks never change."
+          />
+        </Panel>
+      ) : null}
       {vm.canSave ? (
         <Button mode="contained" onPress={vm.submit} loading={vm.saving} disabled={vm.saving}>
-          {vm.isEditing ? 'Save changes' : 'Add task'}
+          {vm.isEditing ? (vm.editScope === 'series' ? 'Save for this and later tasks' : 'Save changes') : vm.repeating ? 'Add repeating task' : 'Add task'}
         </Button>
       ) : null}
     </Screen>
   );
 }
 
-export function TaskProfileScreen({ taskId, onEdit, onOpenGoal }: { taskId: string; onEdit: () => void; onOpenGoal: (id: string) => void }) {
+type TaskProfileProps = { taskId: string; onEdit: () => void; onOpenGoal: (id: string) => void; onOpenSeries: (id: string) => void };
+
+export function TaskProfileScreen({ taskId, onEdit, onOpenGoal, onOpenSeries }: TaskProfileProps) {
   const vm = useTaskDetailViewModel(taskId);
   if (vm.loading) return <LoadingView />;
   if (vm.error || !vm.task) return <ErrorView message={vm.error ?? 'This task could not be found.'} />;
@@ -335,6 +330,17 @@ export function TaskProfileScreen({ taskId, onEdit, onOpenGoal }: { taskId: stri
           { label: 'Details', value: task.description },
         ]}
       />
+      {vm.series ? (
+        <Panel style={styles.list}>
+          <List.Item
+            title="Repeating task"
+            description={vm.series.active ? vm.series.summary : `${vm.series.summary}. No longer repeats.`}
+            left={(p) => <List.Icon {...p} icon="repeat" />}
+            right={(p) => <List.Icon {...p} icon="chevron-right" />}
+            onPress={() => onOpenSeries(vm.series?.id ?? '')}
+          />
+        </Panel>
+      ) : null}
       {vm.linkedGoals.length > 0 ? (
         <Panel style={styles.list}>
           <SectionHeader title="Supports these goals" />
@@ -375,6 +381,9 @@ export function TaskProfileScreen({ taskId, onEdit, onOpenGoal }: { taskId: stri
           Cancel this task
         </Button>
       ) : null}
+      <TaskReminders vm={vm} />
+      <TaskComments vm={vm} />
+      <TaskHistory vm={vm} />
       <ConfirmDialog
         visible={vm.askingReason}
         title="What is blocking this task?"
@@ -386,6 +395,125 @@ export function TaskProfileScreen({ taskId, onEdit, onOpenGoal }: { taskId: stri
         reason={{ label: 'Blocker', value: vm.blockReason, onChange: vm.setBlockReason }}
       />
     </Screen>
+  );
+}
+
+type TaskDetail = ReturnType<typeof useTaskDetailViewModel>;
+
+// Section 9: each person's own reminders. Snoozing or dismissing never moves the due date.
+function TaskReminders({ vm }: { vm: TaskDetail }) {
+  if (!vm.canRemind && vm.reminders.length === 0) return null;
+  const custom = vm.reminderPreset === 'custom';
+  return (
+    <Panel style={styles.list}>
+      <SectionHeader title="Remind me" description="Only you get these, in the app and by email if you allow it." />
+      {vm.reminders.map((reminder) => (
+        <View key={reminder.id} style={styles.inset}>
+          <Row wrap>
+            <Text style={styles.grow}>{formatDateTime(reminder.remindAt)}</Text>
+            <StatusPill label={reminder.state.label} tone={reminder.state.tone} />
+          </Row>
+          {reminder.canSnooze ? (
+            <Row wrap>
+              {vm.snoozeChoices.map((choice) => (
+                <Button key={choice.minutes} compact mode="outlined" onPress={() => vm.snooze(reminder.id, choice.minutes)}>
+                  {`Snooze ${choice.label}`}
+                </Button>
+              ))}
+              <Button compact onPress={() => vm.dismissReminder(reminder.id)}>
+                Dismiss
+              </Button>
+            </Row>
+          ) : null}
+        </View>
+      ))}
+      {vm.canRemind ? (
+        <View style={styles.inset}>
+          <SelectField label="When" value={vm.reminderPreset} options={vm.reminderPresets} onChange={vm.setReminderPreset} />
+          {custom ? (
+            <FieldGrid>
+              <DateField label="Day" value={vm.reminderForm.values.on} onChangeText={(v) => vm.reminderForm.setValue('on', v)} error={vm.reminderForm.errors.on} />
+              <FormField label="Time (HH:MM)" value={vm.reminderForm.values.at} onChangeText={(v) => vm.reminderForm.setValue('at', v)} error={vm.reminderForm.errors.at} keyboardType="numbers-and-punctuation" />
+            </FieldGrid>
+          ) : null}
+          <Button mode="outlined" icon="bell-plus-outline" onPress={vm.addReminder} loading={vm.settingReminder} disabled={vm.settingReminder}>
+            Add reminder
+          </Button>
+        </View>
+      ) : null}
+    </Panel>
+  );
+}
+
+function TaskComments({ vm }: { vm: TaskDetail }) {
+  return (
+    <Panel style={styles.list}>
+      <SectionHeader title="Comments" />
+      {vm.comments.length === 0 ? <Text style={styles.muted}>No comments yet.</Text> : null}
+      {vm.comments.map((comment, index) => (
+        <View key={comment.id}>
+          {index > 0 ? <Divider /> : null}
+          {vm.editingComment === comment.id ? (
+            <View style={styles.inset}>
+              <TextInput mode="outlined" value={vm.editText} onChangeText={vm.setEditText} multiline accessibilityLabel="Edit comment" />
+              <Row>
+                <Button compact mode="contained" onPress={vm.saveComment}>
+                  Save
+                </Button>
+                <Button compact onPress={vm.cancelEditComment}>
+                  Cancel
+                </Button>
+              </Row>
+            </View>
+          ) : (
+            <List.Item
+              title={comment.body}
+              titleNumberOfLines={8}
+              description={`${comment.author} · ${formatDateTime(comment.createdAt)}${comment.editedAt ? ' · edited' : ''}`}
+              right={() =>
+                comment.mine ? (
+                  <View style={styles.rowEnd}>
+                    <IconButton icon="pencil-outline" size={18} onPress={() => vm.startEditComment(comment.id, comment.body)} accessibilityLabel="Edit your comment" />
+                    <IconButton icon="delete-outline" size={18} onPress={() => vm.removeComment(comment.id)} accessibilityLabel="Remove your comment" />
+                  </View>
+                ) : null
+              }
+            />
+          )}
+        </View>
+      ))}
+      {vm.canComment ? (
+        <View style={styles.inset}>
+          <FormField label="Add a comment" value={vm.commentForm.values.body} onChangeText={(v) => vm.commentForm.setValue('body', v)} error={vm.commentForm.errors.body} multiline />
+          <Button mode="outlined" onPress={vm.addComment} loading={vm.addingComment} disabled={vm.addingComment}>
+            Post comment
+          </Button>
+        </View>
+      ) : null}
+    </Panel>
+  );
+}
+
+// Section 4.3: status changes and material edits, from the audit log.
+function TaskHistory({ vm }: { vm: TaskDetail }) {
+  return (
+    <Panel style={styles.list}>
+      <SectionHeader
+        title="History"
+        action={
+          <Button compact onPress={vm.toggleHistory}>
+            {vm.showHistory ? 'Hide' : 'Show'}
+          </Button>
+        }
+      />
+      {vm.historyLoading ? <LoadingView /> : null}
+      {vm.showHistory && !vm.historyLoading && vm.history.length === 0 ? <Text style={styles.muted}>No changes recorded.</Text> : null}
+      {vm.showHistory
+        ? vm.history.map((entry) => (
+            <List.Item key={entry.key} title={entry.lines.join('\n') || 'Updated the task'} titleNumberOfLines={8} description={`${entry.who} · ${formatDateTime(entry.when)}`} />
+          ))
+        : null}
+    </Panel>
   );
 }
 
@@ -482,6 +610,22 @@ export function GoalProfileScreen({ goalId, onEdit, onOpenTask, onAddTask }: Goa
         </Panel>
       ) : null}
 
+      {vm.measurable && vm.observations.length > 0 ? (
+        <Panel style={styles.list}>
+          <SectionHeader title="Progress history" description="Each value recorded by your team, newest first." />
+          {vm.observations.map((entry, index) => (
+            <View key={entry.id}>
+              {index > 0 ? <Divider /> : null}
+              <List.Item
+                title={`${formatQuantity(entry.actualValue)}${goal.unit ? ` ${goal.unit}` : ''}`}
+                description={[formatDate(entry.recordedOn), entry.recordedBy, entry.note].filter(Boolean).join(' · ')}
+                descriptionNumberOfLines={3}
+              />
+            </View>
+          ))}
+        </Panel>
+      ) : null}
+
       {!vm.measurable || vm.milestones.length > 0 ? (
         <Panel style={styles.list}>
           <SectionHeader title="Milestones" />
@@ -566,4 +710,5 @@ const styles = StyleSheet.create({
   done: { color: supporting.mutedText },
   rowEnd: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   search: { backgroundColor: 'transparent' },
+  chips: { gap: spacing.xs, paddingVertical: spacing.xs },
 });

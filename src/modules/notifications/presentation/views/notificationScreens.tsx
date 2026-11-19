@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import { Badge, Divider, IconButton, List, Switch } from 'react-native-paper';
 
 import { formatDate } from '@/core/format/format';
-import { Button, EmptyState, ErrorView, LoadingView, Panel, Screen, SectionHeader, palette, spacing, IconTile } from '@/design-system';
+import { Button, EmptyState, ErrorView, LoadingView, Panel, Screen, SectionHeader, SelectField, palette, spacing, IconTile } from '@/design-system';
 
 import type { AppNotification } from '../../domain/models';
 import { useNotificationsViewModel, useUnreadCount } from '../viewmodels/useNotificationsViewModel';
@@ -14,6 +14,7 @@ const TYPE_ICON: Record<AppNotification['type'], string> = {
   reminder: 'bell-ring-outline',
   platform: 'shield-account-outline',
   business: 'domain',
+  task: 'calendar-check-outline',
 };
 
 export function NotificationBell({ onPress }: { onPress: () => void }) {
@@ -74,7 +75,11 @@ export function NotificationsScreen() {
         <List.Item title="New lessons" right={() => <Switch value={vm.preferences.lessonPublished} onValueChange={(value) => vm.setPreference('lessonPublished', value)} />} />
         <List.Item title="Learning reminders" right={() => <Switch value={vm.preferences.learningReminders} onValueChange={(value) => vm.setPreference('learningReminders', value)} />} />
         <List.Item title="Business account changes" right={() => <Switch value={vm.preferences.businessUpdates} onValueChange={(value) => vm.setPreference('businessUpdates', value)} />} />
+        <List.Item title="Task reminders" description="Reminders you set on Plan tasks" right={() => <Switch value={vm.preferences.taskReminders} onValueChange={(value) => vm.setPreference('taskReminders', value)} />} />
         <List.Item title="Also send these by email" right={() => <Switch value={vm.preferences.emailEnabled} onValueChange={(value) => vm.setPreference('emailEnabled', value)} />} />
+        <View style={styles.quiet}>
+          <SelectField label="Quiet hours for task reminders" value={vm.quietHours} options={vm.quietHoursOptions} onChange={vm.setQuietHours} hint="In your business's time zone. A reminder due then waits until they end." />
+        </View>
       </Panel>
     </Screen>
   );
@@ -84,4 +89,5 @@ const styles = StyleSheet.create({
   badge: { position: 'absolute', top: spacing.xs, right: spacing.xs, backgroundColor: palette.mutedCoral, color: palette.deepTeal },
   list: { padding: spacing.xs, gap: 0 },
   unread: { fontWeight: '700', color: palette.deepTeal },
+  quiet: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
 });

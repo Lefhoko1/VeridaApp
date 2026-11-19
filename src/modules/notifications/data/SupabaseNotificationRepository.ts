@@ -9,7 +9,7 @@ import { DEFAULT_PREFERENCES, type AppNotification, type NotificationPreferences
 const notificationSchema = z
   .object({
     id: z.string(),
-    type: z.enum(['account', 'invitation', 'lesson', 'reminder', 'business', 'platform']),
+    type: z.enum(['account', 'invitation', 'lesson', 'reminder', 'business', 'platform', 'task']),
     title: z.string(),
     body: z.string(),
     read_at: z.string().nullable(),
@@ -27,13 +27,24 @@ const notificationSchema = z
   );
 
 const preferencesSchema = z
-  .object({ lesson_published: z.boolean(), learning_reminders: z.boolean(), business_updates: z.boolean(), email_enabled: z.boolean() })
+  .object({
+    lesson_published: z.boolean(),
+    learning_reminders: z.boolean(),
+    business_updates: z.boolean(),
+    email_enabled: z.boolean(),
+    task_reminders: z.boolean(),
+    quiet_start: z.string().nullable(),
+    quiet_end: z.string().nullable(),
+  })
   .transform(
     (row): NotificationPreferences => ({
       lessonPublished: row.lesson_published,
       learningReminders: row.learning_reminders,
       businessUpdates: row.business_updates,
       emailEnabled: row.email_enabled,
+      taskReminders: row.task_reminders,
+      quietStart: row.quiet_start?.slice(0, 5) ?? null,
+      quietEnd: row.quiet_end?.slice(0, 5) ?? null,
     }),
   );
 
@@ -68,7 +79,7 @@ export class SupabaseNotificationRepository implements NotificationRepository {
   async getPreferences(): Promise<NotificationPreferences> {
     const stored = parseOptionalRow(
       preferencesSchema,
-      await this.db.from('preferences').select('lesson_published, learning_reminders, business_updates, email_enabled').maybeSingle(),
+      await this.db.from('preferences').select('lesson_published, learning_reminders, business_updates, email_enabled, task_reminders, quiet_start, quiet_end').maybeSingle(),
     );
     return stored ?? DEFAULT_PREFERENCES;
   }
@@ -83,6 +94,9 @@ export class SupabaseNotificationRepository implements NotificationRepository {
         learning_reminders: preferences.learningReminders,
         business_updates: preferences.businessUpdates,
         email_enabled: preferences.emailEnabled,
+        task_reminders: preferences.taskReminders,
+        quiet_start: preferences.quietStart,
+        quiet_end: preferences.quietEnd,
         updated_at: new Date().toISOString(),
       }),
     );

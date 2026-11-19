@@ -11,6 +11,8 @@ export const workspacesKey = (userId: string | undefined) => ['workspaces', user
 
 type ActiveBusinessState = {
   status: 'loading' | 'error' | 'none' | 'ready';
+  // The signed-in person, so other modules can tell their own items from others'.
+  userId: string | null;
   error: string | null;
   retry: () => void;
   workspaces: Workspace[];
@@ -76,6 +78,7 @@ export function ActiveBusinessProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ActiveBusinessState>(
     () => ({
       status: failure ? 'error' : loading ? 'loading' : business ? 'ready' : 'none',
+      userId: userId ?? null,
       error: failure ? errorMessage(failure) : null,
       retry: () => {
         void workspaces.refetch();
@@ -91,7 +94,7 @@ export function ActiveBusinessProvider({ children }: { children: ReactNode }) {
     }),
     // refetch functions are stable across renders.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [failure, loading, business, workspaces.data, industries.data, permissions.data, switchTo, refresh],
+    [failure, loading, business, userId, workspaces.data, industries.data, permissions.data, switchTo, refresh],
   );
 
   return <ActiveBusinessContext.Provider value={value}>{children}</ActiveBusinessContext.Provider>;
@@ -105,6 +108,7 @@ export function useBusinessContext(): ActiveBusinessState {
 
 export type ActiveBusiness = {
   business: Workspace;
+  userId: string | null;
   industry: Industry | null;
   industries: Industry[];
   can: (permission: Permission) => boolean;
@@ -112,8 +116,8 @@ export type ActiveBusiness = {
 
 // For screens inside the workspace, where a business is guaranteed by the route guard.
 export function useActiveBusiness(): ActiveBusiness {
-  const { business, industry, industries, permissions } = useBusinessContext();
+  const { business, userId, industry, industries, permissions } = useBusinessContext();
   if (!business) throw new Error('useActiveBusiness requires an active business.');
   const can = useCallback((permission: Permission) => permissions.includes(permission), [permissions]);
-  return { business, industry, industries, can };
+  return { business, userId, industry, industries, can };
 }

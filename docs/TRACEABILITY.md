@@ -84,8 +84,21 @@ Three later specifications in `requirements/` extend the original: the Business 
 | 1b Universal sales and expense categories | Taxonomy sections 3 and 4: nine sales and twelve expense categories, with the expense subcategories, in `platform.finance_categories`. Staff add, rename, reorder and deactivate them under Sales and expense categories. Each business type's own categories are reported under one of them, and every sale and expense stores the universal category it belongs to | Done |
 | 2 Activity catalogue | Ten activity groups, activity forms defined as data, an activity lifecycle, links to sales, expenses, products and a responsible person, owners switching activity types on or off, complete Poultry and Tuckshop sets, and the catalogue's activities for every other subcategory | Done |
 | 3 Plan module, core (P0) | A Plan tab between Insights and Learn with Overview, Goals and Tasks. Measurable goals (increase, reduce, keep at a level, reach at least) and milestone goals, progress observations, goals that follow a Verida measure, tasks with priorities, statuses, due dates, assignees and blockers, many-to-many task and goal links, and the section 7 measures. New permissions: View plan, Work on tasks, Manage goals | Done |
-| 4 Plan module, schedule and collaboration (P1), then AI planning (P2) | Calendar views, repeating tasks, reminders, comments, weekly reviews, then AI suggestions | Not started |
+| 4a Plan module, schedule and collaboration (P1) | Schedule and Progress sections, so Plan has all five from section 1.2. A schedule with list, day, week and month views; events; repeating tasks (daily, weekly on chosen days, monthly, every n), editing one occurrence or the series; reminders with snooze and dismiss, a task reminders setting and quiet hours; task comments; task history; weekly reviews; goal progress history; conflicting edits refused rather than overwritten | Done |
+| 4b Plan module, AI planning (P2) | On-request planning, insight-to-task suggestions, goal breakdown and weekly suggestions, each approved by the owner before anything is created | Not started |
 | 5 Sales, payments and offline capture | Line items, refunds, payments and offline sync | Not started |
+
+Notes on phase 4a:
+
+- A repeating task is a series (`plan.recurring_rules`). Each date becomes its own task about a week ahead, with the series and date as a unique key, so generating twice, from the app and the nightly job, never creates a duplicate. Later dates appear on the schedule as "Repeats" until they become tasks, and never next to their own task. A series started with a past date does not create overdue work for days before it existed.
+- Editing an occurrence asks whether the change is for that task only or for it and later ones. Changing the series updates later occurrences nobody has started or changed on their own; past ones keep their history. The pattern itself cannot change, so a different pattern is a new series. Stopping a series cancels the later tasks nobody had touched and keeps today's.
+- Events have a day and optional local times in the business's time zone. Recurring events are not covered; repeating applies to tasks.
+- Reminders belong to the person who sets them. They arrive as in-app notifications, and by email when that person allows it. A reminder inside their quiet hours waits until the hours end, one for a closed task is not sent, and turning off task reminders stops them. Snoozing or dismissing never changes the due date. A reminder well past its time that has not gone out is shown as waiting rather than sent. Delivery needs the jobs in `supabase/setup/schedule_jobs.sql`.
+- Comments can be edited and removed only by their author. Viewers can read them but not write.
+- A task's history comes from the audit log and shows the fields that matter to the team, with old and new values.
+- A weekly review lists what was completed, what was due and is still open, what is blocked and what is due next week, beside the week's completion and on-time rates. Owners and managers write the notes, one review per week. Finishing tasks is never shown as proof that a goal moved.
+- Saving a task sends the version it was opened at. If someone changed it meanwhile, nothing is saved and the person is told to reopen it (section 8). Full offline capture remains in phase 5.
+- Section 13's open decisions were taken as: in-app and email notifications for the pilot, with push later; attachments on tasks deferred.
 
 Notes on phase 3:
 

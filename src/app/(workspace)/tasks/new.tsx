@@ -4,5 +4,11 @@ import { TaskFormScreen } from '@/modules/plan';
 
 export default function NewTaskRoute() {
   const { goal } = useLocalSearchParams<{ goal?: string }>();
-  return <TaskFormScreen goalId={goal} onDone={(id) => router.replace({ pathname: '/tasks/[id]', params: { id } })} />;
+  return (
+    <TaskFormScreen
+      goalId={goal}
+      onDone={(id) => router.replace({ pathname: '/tasks/[id]', params: { id } })}
+      onSeriesCreated={(id) => router.replace({ pathname: '/series/[id]', params: { id } })}
+    />
+  );
 }

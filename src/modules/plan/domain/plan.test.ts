@@ -1,5 +1,5 @@
 import { describeProgress, focusOrder, isOverdue, type GoalProgress, type Task } from './models';
-import { goalFormSchema, taskFormSchema } from './validation';
+import { goalFormSchema, ruleFields, taskFormSchema } from './validation';
 
 const task = (overrides: Partial<Task>): Task => ({
   id: overrides.title ?? 't',
@@ -15,6 +15,9 @@ const task = (overrides: Partial<Task>): Task => ({
   version: 1,
   createdAt: '2026-10-01T00:00:00Z',
   goalIds: [],
+  completedOn: null,
+  ruleId: null,
+  occurrenceOn: null,
   ...overrides,
 });
 
@@ -44,7 +47,7 @@ describe('tasks (Plan section 4.3 and 7)', () => {
   });
 
   it('asks only for a title, and a reason when blocked', () => {
-    const base = { title: 'Order feed', description: '', priority: 'normal', status: 'not_started', dueOn: '', completionNote: '', blockerReason: '', assignedTo: '', goalIds: 'a,b' };
+    const base = { title: 'Order feed', description: '', priority: 'normal', status: 'not_started', dueOn: '', completionNote: '', blockerReason: '', assignedTo: '', goalIds: 'a,b', ...ruleFields.defaults };
     expect(taskFormSchema.parse(base)).toMatchObject({ dueOn: null, assignedTo: null, goalIds: ['a', 'b'] });
     expect(taskFormSchema.safeParse({ ...base, status: 'blocked' }).success).toBe(false);
     expect(taskFormSchema.safeParse({ ...base, title: ' ' }).success).toBe(false);

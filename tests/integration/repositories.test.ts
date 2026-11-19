@@ -539,9 +539,10 @@ describe('notifications', () => {
     await notifications.markRead(welcome!.id);
     expect((await notifications.list())[0]?.isRead).toBe(true);
 
-    expect(await notifications.getPreferences()).toEqual({ lessonPublished: true, learningReminders: true, businessUpdates: true, emailEnabled: true });
-    await notifications.savePreferences({ lessonPublished: false, learningReminders: true, businessUpdates: true, emailEnabled: false });
-    expect((await notifications.getPreferences()).lessonPublished).toBe(false);
+    const defaults = { lessonPublished: true, learningReminders: true, businessUpdates: true, emailEnabled: true, taskReminders: true, quietStart: null, quietEnd: null };
+    expect(await notifications.getPreferences()).toEqual(defaults);
+    await notifications.savePreferences({ ...defaults, lessonPublished: false, emailEnabled: false, quietStart: '21:00', quietEnd: '06:00' });
+    expect(await notifications.getPreferences()).toMatchObject({ lessonPublished: false, quietStart: '21:00', quietEnd: '06:00' });
 
     await notifications.remove(welcome!.id);
     expect(await notifications.list()).toEqual([]);
@@ -598,5 +599,75 @@ describe('plan', () => {
 
     expect(await plan.overview(id, { from: '2026-10-01', to: '2026-10-31' })).toMatchObject({ openTasks: 0, activeGoals: 2, eligibleDue: 1 });
     expect((await plan.kpiOptions(id)).map((kpi) => kpi.code)).toContain('eggs_collected');
+  });
+
+  it('schedules repeating tasks and events, with reminders, comments, history and reviews (Plan module P1)', async () => {
+    const { client, userId } = await newUser('Scheduler');
+    const id = await newBusiness(client, { name: 'Schedule Farm' });
+    const plan = new SupabasePlanRepository(client);
+    const today = new Date().toISOString().slice(0, 10);
+    const inDays = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+
+    const ruleId = await plan.createRule(id, {
+      title: 'Collect eggs',
+      description: null,
+      priority: 'high',
+      assignedTo: userId,
+      frequency: 'daily',
+      intervalCount: 1,
+      daysOfWeek: [],
+      dayOfMonth: null,
+      startsOn: inDays(1),
+      endsOn: null,
+    });
+    expect(await plan.getRule(ruleId)).toMatchObject({ frequency: 'daily', status: 'active', assignedTo: userId });
+    const occurrences = await plan.listOccurrences(ruleId);
+    expect(occurrences.length).toBeGreaterThanOrEqual(6);
+    expect(occurrences.every((task) => task.ruleId === ruleId && task.occurrenceOn === task.dueOn)).toBe(true);
+    expect(await plan.generateOccurrences(id)).toBe(0);
+
+    const eventId = await plan.createEvent(id, { title: 'Vet visit', description: null, eventType: 'appointment', startsOn: inDays(2), startTime: '09:30', endTime: '10:00', status: 'scheduled' });
+    expect(await plan.getEvent(eventId)).toMatchObject({ startTime: '09:30', endTime: '10:00' });
+    const items = await plan.schedule(id, { from: today, to: inDays(30) });
+    expect(items.filter((item) => item.kind === 'event')).toHaveLength(1);
+    const days = items.filter((item) => item.ruleId === ruleId).map((item) => item.onDate);
+    expect(new Set(days).size).toBe(days.length);
+    expect(items.some((item) => item.kind === 'projected')).toBe(true);
+
+    await plan.updateRule(ruleId, { title: 'Collect and grade eggs', description: null, priority: 'high', assignedTo: userId, endsOn: null });
+    expect((await plan.listOccurrences(ruleId)).every((task) => task.title === 'Collect and grade eggs')).toBe(true);
+
+    const [first] = occurrences;
+    const task = await plan.getTask(first!.id);
+    await plan.setReminder(task.id, inDays(1), '07:00');
+    const [reminder] = await plan.listReminders(task.id);
+    expect(reminder).toMatchObject({ status: 'pending' });
+    await plan.snoozeReminder(reminder!.id, 60);
+    await plan.dismissReminder(reminder!.id);
+    expect((await plan.listReminders(task.id))[0]?.status).toBe('dismissed');
+
+    await plan.addComment(id, task.id, 'Tray stock is low');
+    const [comment] = await plan.listComments(task.id);
+    expect(comment).toMatchObject({ body: 'Tray stock is low', authorId: userId, editedAt: null });
+    await plan.editComment(comment!.id, 'Tray stock is very low');
+    expect((await plan.listComments(task.id))[0]?.editedAt).not.toBeNull();
+    await plan.removeComment(comment!.id);
+    expect(await plan.listComments(task.id)).toEqual([]);
+
+    const input = { title: task.title, description: null, priority: task.priority, status: 'completed' as const, dueOn: task.dueOn, completionNote: null, blockerReason: null, assignedTo: userId, goalIds: [] };
+    await expect(plan.updateTask(id, task.id, input, task.version + 5)).rejects.toMatchObject({ code: 'conflict' });
+    await plan.updateTask(id, task.id, input, task.version);
+    expect(await plan.getTask(task.id)).toMatchObject({ status: 'completed', completedOn: today });
+    const history = await plan.taskHistory(task.id);
+    expect(history[0]?.changes.status).toEqual({ from: 'not_started', to: 'completed' });
+
+    const period = { from: '2026-11-09', to: '2026-11-15' };
+    expect(await plan.getReview(id, period.from)).toBeNull();
+    await plan.saveReview(id, period, { summary: null, wins: 'Sold out', blockers: null, nextPriorities: 'Order feed' });
+    await plan.saveReview(id, period, { summary: 'Good week', wins: 'Sold out', blockers: null, nextPriorities: 'Order feed' });
+    expect(await plan.listReviews(id)).toEqual([expect.objectContaining({ periodStart: period.from, summary: 'Good week' })]);
+
+    await plan.endRule(ruleId);
+    expect((await plan.getRule(ruleId)).status).toBe('ended');
   });
 });

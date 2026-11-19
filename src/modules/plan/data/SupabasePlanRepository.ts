@@ -1,28 +1,43 @@
 import { z } from 'zod';
 
+import { AppError } from '@/core/errors/AppError';
 import type { SupabaseClient } from '@/core/supabase/client';
-import { assertSuccess, nullableNumeric, numeric, parseRow, parseRows } from '@/core/supabase/response';
+import { assertSuccess, nullableNumeric, numeric, parseOptionalRow, parseRow, parseRows } from '@/core/supabase/response';
 
-import type { Goal, GoalInput, GoalProgress, KpiOption, Milestone, PlanOverview, ProgressEntry, Task, TaskInput } from '../domain/models';
+import type { Goal, GoalInput, GoalProgress, KpiOption, Milestone, PlanOverview, ProgressEntry, ProgressObservation, Task, TaskInput } from '../domain/models';
 import type { PlanRepository } from '../domain/repositories';
+import type { EventInput, PlanEvent, PlanReview, RecurringRule, Reminder, ReviewInput, RuleInput, RuleUpdate, ScheduleItem, TaskComment, TaskHistoryEntry } from '../domain/schedule';
 
 const LIST_LIMIT = 500;
 
-const TASK_COLUMNS = 'id, title, description, priority, status, due_on, completed_at, completion_note, blocker_reason, assigned_to, version, created_at';
+const TASK_COLUMNS =
+  'id, title, description, priority, status, due_on, completed_at, completed_on, completion_note, blocker_reason, assigned_to, version, created_at, rule_id, occurrence_on';
+
+const PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const;
+const TASK_STATUSES = ['not_started', 'in_progress', 'blocked', 'completed', 'cancelled'] as const;
+
+// Postgres gives times as HH:MM:SS; the app works in HH:MM.
+const localTime = z
+  .string()
+  .nullable()
+  .transform((value) => (value === null ? null : value.slice(0, 5)));
 
 const taskSchema = z.object({
   id: z.string(),
   title: z.string(),
   description: z.string().nullable(),
-  priority: z.enum(['low', 'normal', 'high', 'urgent']),
-  status: z.enum(['not_started', 'in_progress', 'blocked', 'completed', 'cancelled']),
+  priority: z.enum(PRIORITIES),
+  status: z.enum(TASK_STATUSES),
   due_on: z.string().nullable(),
   completed_at: z.string().nullable(),
+  completed_on: z.string().nullable(),
   completion_note: z.string().nullable(),
   blocker_reason: z.string().nullable(),
   assigned_to: z.string().nullable(),
   version: numeric,
   created_at: z.string(),
+  rule_id: z.string().nullable(),
+  occurrence_on: z.string().nullable(),
 });
 
 const toTask = (row: z.output<typeof taskSchema>, goalIds: string[]): Task => ({
@@ -39,6 +54,9 @@ const toTask = (row: z.output<typeof taskSchema>, goalIds: string[]): Task => ({
   version: row.version,
   createdAt: row.created_at,
   goalIds,
+  completedOn: row.completed_on,
+  ruleId: row.rule_id,
+  occurrenceOn: row.occurrence_on,
 });
 
 const toTaskRow = (input: TaskInput) => ({
@@ -175,6 +193,161 @@ const kpiSchema = z.object({ code: z.string(), name: z.string(), unit_kind: z.st
 
 const idSchema = z.object({ id: z.string() });
 
+const observationSchema = z
+  .object({ id: z.string(), recorded_on: z.string(), actual_value: numeric, note: z.string().nullable(), created_at: z.string(), created_by: z.string().nullable() })
+  .transform(
+    (row): ProgressObservation => ({ id: row.id, recordedOn: row.recorded_on, actualValue: row.actual_value, note: row.note, createdAt: row.created_at, createdBy: row.created_by }),
+  );
+
+const RULE_COLUMNS = 'id, title, description, priority, assigned_to, frequency, interval_count, days_of_week, day_of_month, starts_on, ends_on, status';
+
+const ruleSchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    description: z.string().nullable(),
+    priority: z.enum(PRIORITIES),
+    assigned_to: z.string().nullable(),
+    frequency: z.enum(['daily', 'weekly', 'monthly']),
+    interval_count: numeric,
+    days_of_week: z.array(numeric).nullable(),
+    day_of_month: nullableNumeric,
+    starts_on: z.string(),
+    ends_on: z.string().nullable(),
+    status: z.enum(['active', 'ended']),
+  })
+  .transform(
+    (row): RecurringRule => ({
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      priority: row.priority,
+      assignedTo: row.assigned_to,
+      frequency: row.frequency,
+      intervalCount: row.interval_count,
+      daysOfWeek: row.days_of_week ?? [],
+      dayOfMonth: row.day_of_month,
+      startsOn: row.starts_on,
+      endsOn: row.ends_on,
+      status: row.status,
+    }),
+  );
+
+const EVENT_COLUMNS = 'id, title, description, event_type, starts_on, start_time, end_time, status, version';
+const EVENT_TYPES = ['meeting', 'delivery', 'appointment', 'deadline', 'other'] as const;
+const EVENT_STATUSES = ['scheduled', 'done', 'cancelled'] as const;
+
+const eventSchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    description: z.string().nullable(),
+    event_type: z.enum(EVENT_TYPES),
+    starts_on: z.string(),
+    start_time: localTime,
+    end_time: localTime,
+    status: z.enum(EVENT_STATUSES),
+    version: numeric,
+  })
+  .transform(
+    (row): PlanEvent => ({
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      eventType: row.event_type,
+      startsOn: row.starts_on,
+      startTime: row.start_time,
+      endTime: row.end_time,
+      status: row.status,
+      version: row.version,
+    }),
+  );
+
+const toEventRow = (input: EventInput) => ({
+  title: input.title,
+  description: input.description,
+  event_type: input.eventType,
+  starts_on: input.startsOn,
+  start_time: input.startTime,
+  end_time: input.startTime ? input.endTime : null,
+  status: input.status,
+});
+
+const scheduleSchema = z
+  .object({
+    kind: z.enum(['task', 'event', 'projected']),
+    id: z.string().nullable(),
+    rule_id: z.string().nullable(),
+    title: z.string(),
+    on_date: z.string(),
+    start_time: localTime,
+    end_time: localTime,
+    status: z.enum([...TASK_STATUSES, ...EVENT_STATUSES]),
+    priority: z.enum(PRIORITIES).nullable(),
+    assigned_to: z.string().nullable(),
+    event_type: z.enum(EVENT_TYPES).nullable(),
+  })
+  .transform(
+    (row): ScheduleItem => ({
+      kind: row.kind,
+      id: row.id,
+      ruleId: row.rule_id,
+      title: row.title,
+      onDate: row.on_date,
+      startTime: row.start_time,
+      endTime: row.end_time,
+      status: row.status,
+      priority: row.priority,
+      assignedTo: row.assigned_to,
+      eventType: row.event_type,
+    }),
+  );
+
+const reminderSchema = z
+  .object({ id: z.string(), remind_at: z.string(), status: z.enum(['pending', 'sent', 'dismissed', 'skipped', 'cancelled']), sent_at: z.string().nullable() })
+  .transform((row): Reminder => ({ id: row.id, remindAt: row.remind_at, status: row.status, sentAt: row.sent_at }));
+
+const commentSchema = z
+  .object({ id: z.string(), author_id: z.string(), body: z.string(), created_at: z.string(), edited_at: z.string().nullable() })
+  .transform((row): TaskComment => ({ id: row.id, authorId: row.author_id, body: row.body, createdAt: row.created_at, editedAt: row.edited_at }));
+
+const historySchema = z
+  .object({
+    occurred_at: z.string(),
+    action: z.enum(['INSERT', 'UPDATE', 'DELETE']),
+    actor_name: z.string().nullable(),
+    changes: z.record(z.string(), z.object({ from: z.unknown(), to: z.unknown() })),
+  })
+  .transform((row): TaskHistoryEntry => ({ occurredAt: row.occurred_at, action: row.action, actorName: row.actor_name, changes: row.changes }));
+
+const REVIEW_COLUMNS = 'id, period_start, period_end, summary, wins, blockers, next_priorities, updated_at';
+
+const reviewSchema = z
+  .object({
+    id: z.string(),
+    period_start: z.string(),
+    period_end: z.string(),
+    summary: z.string().nullable(),
+    wins: z.string().nullable(),
+    blockers: z.string().nullable(),
+    next_priorities: z.string().nullable(),
+    updated_at: z.string(),
+  })
+  .transform(
+    (row): PlanReview => ({
+      id: row.id,
+      periodStart: row.period_start,
+      periodEnd: row.period_end,
+      summary: row.summary,
+      wins: row.wins,
+      blockers: row.blockers,
+      nextPriorities: row.next_priorities,
+      updatedAt: row.updated_at,
+    }),
+  );
+
+const countSchema = z.coerce.number();
+
 // Row-level security limits every read and write to members with the plan permissions.
 export class SupabasePlanRepository implements PlanRepository {
   constructor(private readonly client: SupabaseClient) {}
@@ -225,8 +398,14 @@ export class SupabasePlanRepository implements PlanRepository {
     return id;
   }
 
-  async updateTask(businessId: string, id: string, input: TaskInput): Promise<void> {
-    assertSuccess(await this.db.from('tasks').update(toTaskRow(input)).eq('id', id));
+  async updateTask(businessId: string, id: string, input: TaskInput, expectedVersion?: number): Promise<void> {
+    let query = this.db.from('tasks').update(toTaskRow(input)).eq('id', id);
+    if (expectedVersion !== undefined) query = query.eq('version', expectedVersion);
+    const updated = parseRows(idSchema, await query.select('id'));
+    // Section 8: a change made meanwhile elsewhere is surfaced rather than silently overwritten.
+    if (updated.length === 0) {
+      throw new AppError('conflict', 'Someone changed this task while you were working on it. Nothing was saved. Open it again to see the latest version.');
+    }
     const current = (await this.linksFor({ taskId: id })).get(id) ?? [];
     await this.setGoals(businessId, id, input.goalIds, current);
   }
@@ -259,6 +438,19 @@ export class SupabasePlanRepository implements PlanRepository {
     );
   }
 
+  async listProgress(goalId: string): Promise<ProgressObservation[]> {
+    return parseRows(
+      observationSchema,
+      await this.db
+        .from('goal_progress')
+        .select('id, recorded_on, actual_value, note, created_at, created_by')
+        .eq('goal_id', goalId)
+        .order('recorded_on', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(100),
+    );
+  }
+
   async listMilestones(goalId: string): Promise<Milestone[]> {
     return parseRows(
       milestoneSchema,
@@ -280,5 +472,121 @@ export class SupabasePlanRepository implements PlanRepository {
 
   async kpiOptions(businessId: string): Promise<KpiOption[]> {
     return parseRows(kpiSchema, await this.db.rpc('kpi_options', { p_business_id: businessId }));
+  }
+
+  async schedule(businessId: string, period: { from: string; to: string }): Promise<ScheduleItem[]> {
+    return parseRows(scheduleSchema, await this.db.rpc('schedule', { p_business_id: businessId, p_from: period.from, p_to: period.to }));
+  }
+
+  async generateOccurrences(businessId: string): Promise<number> {
+    const response = await this.db.rpc('generate_occurrences', { p_business_id: businessId });
+    assertSuccess(response);
+    return countSchema.parse(response.data ?? 0);
+  }
+
+  async getRule(id: string): Promise<RecurringRule> {
+    return parseRow(ruleSchema, await this.db.from('recurring_rules').select(RULE_COLUMNS).eq('id', id).single());
+  }
+
+  async createRule(businessId: string, input: RuleInput): Promise<string> {
+    const row = {
+      business_id: businessId,
+      title: input.title,
+      description: input.description,
+      priority: input.priority,
+      assigned_to: input.assignedTo,
+      frequency: input.frequency,
+      interval_count: input.intervalCount,
+      days_of_week: input.frequency === 'weekly' ? input.daysOfWeek : null,
+      day_of_month: input.frequency === 'monthly' ? input.dayOfMonth : null,
+      starts_on: input.startsOn,
+      ends_on: input.endsOn,
+    };
+    return parseRow(idSchema, await this.db.from('recurring_rules').insert(row).select('id').single()).id;
+  }
+
+  async updateRule(id: string, input: RuleUpdate): Promise<void> {
+    assertSuccess(
+      await this.db
+        .from('recurring_rules')
+        .update({ title: input.title, description: input.description, priority: input.priority, assigned_to: input.assignedTo, ends_on: input.endsOn })
+        .eq('id', id),
+    );
+  }
+
+  async endRule(id: string): Promise<void> {
+    assertSuccess(await this.db.from('recurring_rules').update({ status: 'ended' }).eq('id', id));
+  }
+
+  async listOccurrences(ruleId: string): Promise<Task[]> {
+    const rows = await this.db.from('tasks').select(TASK_COLUMNS).eq('rule_id', ruleId).order('occurrence_on', { ascending: false }).limit(60);
+    return parseRows(taskSchema, rows).map((row) => toTask(row, []));
+  }
+
+  async getEvent(id: string): Promise<PlanEvent> {
+    return parseRow(eventSchema, await this.db.from('events').select(EVENT_COLUMNS).eq('id', id).single());
+  }
+
+  async createEvent(businessId: string, input: EventInput): Promise<string> {
+    return parseRow(idSchema, await this.db.from('events').insert({ business_id: businessId, ...toEventRow(input) }).select('id').single()).id;
+  }
+
+  async updateEvent(id: string, input: EventInput): Promise<void> {
+    assertSuccess(await this.db.from('events').update(toEventRow(input)).eq('id', id));
+  }
+
+  async listReminders(taskId: string): Promise<Reminder[]> {
+    return parseRows(reminderSchema, await this.db.from('task_reminders').select('id, remind_at, status, sent_at').eq('task_id', taskId).order('remind_at'));
+  }
+
+  async setReminder(taskId: string, on: string, at: string): Promise<void> {
+    assertSuccess(await this.db.rpc('set_reminder', { p_task_id: taskId, p_on: on, p_at: at }));
+  }
+
+  async snoozeReminder(id: string, minutes: number): Promise<void> {
+    assertSuccess(await this.db.rpc('snooze_reminder', { p_id: id, p_minutes: minutes }));
+  }
+
+  async dismissReminder(id: string): Promise<void> {
+    assertSuccess(await this.db.rpc('dismiss_reminder', { p_id: id }));
+  }
+
+  async listComments(taskId: string): Promise<TaskComment[]> {
+    return parseRows(commentSchema, await this.db.from('task_comments').select('id, author_id, body, created_at, edited_at').eq('task_id', taskId).order('created_at').limit(200));
+  }
+
+  async addComment(businessId: string, taskId: string, body: string): Promise<void> {
+    assertSuccess(await this.db.from('task_comments').insert({ business_id: businessId, task_id: taskId, body }));
+  }
+
+  async editComment(id: string, body: string): Promise<void> {
+    assertSuccess(await this.db.from('task_comments').update({ body }).eq('id', id));
+  }
+
+  async removeComment(id: string): Promise<void> {
+    assertSuccess(await this.db.from('task_comments').delete().eq('id', id));
+  }
+
+  async taskHistory(taskId: string): Promise<TaskHistoryEntry[]> {
+    return parseRows(historySchema, await this.db.rpc('task_history', { p_task_id: taskId }));
+  }
+
+  async listReviews(businessId: string): Promise<PlanReview[]> {
+    return parseRows(reviewSchema, await this.db.from('reviews').select(REVIEW_COLUMNS).eq('business_id', businessId).order('period_start', { ascending: false }).limit(52));
+  }
+
+  async getReview(businessId: string, periodStart: string): Promise<PlanReview | null> {
+    return parseOptionalRow(reviewSchema, await this.db.from('reviews').select(REVIEW_COLUMNS).eq('business_id', businessId).eq('period_start', periodStart).maybeSingle());
+  }
+
+  // Insert or update rather than upsert, since clients may not write the key columns on update.
+  async saveReview(businessId: string, period: { from: string; to: string }, input: ReviewInput): Promise<void> {
+    const notes = { summary: input.summary, wins: input.wins, blockers: input.blockers, next_priorities: input.nextPriorities };
+    const existing = await this.getReview(businessId, period.from);
+    if (existing) {
+      assertSuccess(await this.db.from('reviews').update(notes).eq('id', existing.id));
+    } else {
+      assertSuccess(await this.db.from('reviews').insert({ business_id: businessId, period_start: period.from, period_end: period.to, ...notes }));
+    }
   }
 }
