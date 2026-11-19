@@ -6,6 +6,7 @@ import Animated, { ZoomIn } from 'react-native-reanimated';
 import { palette, supporting } from '../theme/palette';
 import { radius, shadows, spacing } from '../theme/theme';
 import { Illustration, type IllustrationName } from './art';
+import { CalendarSheet } from './calendarSheet';
 import { Button } from './button';
 import { GrowBar, motion } from './motion';
 import type { SelectOption } from './optionSelection';
@@ -142,8 +143,27 @@ function FieldButton({ label, text, spoken, placeholder, error, hint, disabled, 
   );
 }
 
-export function DateField(props: Omit<FormFieldProps, 'keyboardType' | 'placeholder'>) {
-  return <FormField {...props} placeholder="YYYY-MM-DD" keyboardType="numbers-and-punctuation" hint={props.hint ?? 'Format: YYYY-MM-DD'} />;
+// Typing a date still works; the calendar button opens a month to choose from. A label that
+// says "optional" lets the calendar clear the field.
+export function DateField(props: Omit<FormFieldProps, 'keyboardType' | 'placeholder' | 'right'>) {
+  const [open, setOpen] = useState(false);
+  const label = typeof props.label === 'string' ? props.label : 'Choose a date';
+  const pick = (iso: string) => {
+    setOpen(false);
+    props.onChangeText?.(iso);
+  };
+  return (
+    <>
+      <FormField
+        {...props}
+        placeholder="YYYY-MM-DD"
+        keyboardType="numbers-and-punctuation"
+        hint={props.hint ?? 'Tap the calendar, or type YYYY-MM-DD'}
+        right={props.disabled ? undefined : <TextInput.Icon icon="calendar-month-outline" onPress={() => setOpen(true)} accessibilityLabel={`Open calendar for ${label}`} />}
+      />
+      <CalendarSheet visible={open} title={label} value={props.value ?? ''} clearable={/optional/i.test(label)} onPick={pick} onDismiss={() => setOpen(false)} />
+    </>
+  );
 }
 
 type ChoiceCardProps = { title: string; description?: string; selected: boolean; onPress: () => void; illustration?: IllustrationName; multiple?: boolean };
