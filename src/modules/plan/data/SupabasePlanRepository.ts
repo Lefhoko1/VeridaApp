@@ -6,7 +6,8 @@ import { assertSuccess, nullableNumeric, numeric, parseOptionalRow, parseRow, pa
 
 import type { Goal, GoalInput, GoalProgress, KpiOption, Milestone, PlanOverview, ProgressEntry, ProgressObservation, Task, TaskInput } from '../domain/models';
 import type { PlanRepository } from '../domain/repositories';
-import type { EventInput, PlanEvent, PlanReview, RecurringRule, Reminder, ReviewInput, RuleInput, RuleUpdate, ScheduleItem, TaskComment, TaskHistoryEntry } from '../domain/schedule';
+import type { ActionEdits, GoalMeasure, LinkTarget, PlanSettings, Suggestion, SuggestionKind, TaskLink } from '../domain/assist';
+import type { EventInput, EventRuleInput, PlanEvent, PlanReview, RecurringRule, Reminder, ReviewInput, RuleInput, RuleUpdate, ScheduleItem, TaskComment, TaskHistoryEntry } from '../domain/schedule';
 
 const LIST_LIMIT = 500;
 
@@ -199,7 +200,7 @@ const observationSchema = z
     (row): ProgressObservation => ({ id: row.id, recordedOn: row.recorded_on, actualValue: row.actual_value, note: row.note, createdAt: row.created_at, createdBy: row.created_by }),
   );
 
-const RULE_COLUMNS = 'id, title, description, priority, assigned_to, frequency, interval_count, days_of_week, day_of_month, starts_on, ends_on, status';
+const RULE_COLUMNS = 'id, title, description, priority, assigned_to, frequency, interval_count, days_of_week, day_of_month, starts_on, ends_on, status, kind, event_type, start_time, end_time';
 
 const ruleSchema = z
   .object({
@@ -215,6 +216,10 @@ const ruleSchema = z
     starts_on: z.string(),
     ends_on: z.string().nullable(),
     status: z.enum(['active', 'ended']),
+    kind: z.enum(['task', 'event']),
+    event_type: z.enum(['meeting', 'delivery', 'appointment', 'deadline', 'other']).nullable(),
+    start_time: localTime,
+    end_time: localTime,
   })
   .transform(
     (row): RecurringRule => ({
@@ -230,10 +235,14 @@ const ruleSchema = z
       startsOn: row.starts_on,
       endsOn: row.ends_on,
       status: row.status,
+      kind: row.kind,
+      eventType: row.event_type,
+      startTime: row.start_time,
+      endTime: row.end_time,
     }),
   );
 
-const EVENT_COLUMNS = 'id, title, description, event_type, starts_on, start_time, end_time, status, version';
+const EVENT_COLUMNS = 'id, title, description, event_type, starts_on, start_time, end_time, status, version, rule_id';
 const EVENT_TYPES = ['meeting', 'delivery', 'appointment', 'deadline', 'other'] as const;
 const EVENT_STATUSES = ['scheduled', 'done', 'cancelled'] as const;
 
@@ -248,6 +257,7 @@ const eventSchema = z
     end_time: localTime,
     status: z.enum(EVENT_STATUSES),
     version: numeric,
+    rule_id: z.string().nullable(),
   })
   .transform(
     (row): PlanEvent => ({
@@ -260,6 +270,7 @@ const eventSchema = z
       endTime: row.end_time,
       status: row.status,
       version: row.version,
+      ruleId: row.rule_id,
     }),
   );
 
@@ -348,6 +359,104 @@ const reviewSchema = z
 
 const countSchema = z.coerce.number();
 
+const payloadSchema = z.record(z.string(), z.unknown());
+
+const actionSchema = z
+  .object({
+    id: z.string(),
+    recommendation_id: z.string(),
+    action_type: z.enum(['create_task', 'update_task', 'create_milestone', 'create_event', 'create_goal']),
+    proposed_payload: payloadSchema,
+    final_payload: payloadSchema.nullable(),
+    why: z.string().nullable(),
+    approval_status: z.enum(['proposed', 'accepted', 'edited', 'dismissed']),
+    created_task_id: z.string().nullable(),
+    created_goal_id: z.string().nullable(),
+    created_event_id: z.string().nullable(),
+    created_milestone_id: z.string().nullable(),
+    decided_at: z.string().nullable(),
+  })
+  .transform((row) => ({
+    recommendationId: row.recommendation_id,
+    action: {
+      id: row.id,
+      type: row.action_type,
+      payload: row.proposed_payload,
+      finalPayload: row.final_payload,
+      why: row.why,
+      status: row.approval_status,
+      createdTaskId: row.created_task_id,
+      createdGoalId: row.created_goal_id,
+      createdEventId: row.created_event_id,
+      createdMilestoneId: row.created_milestone_id,
+      decidedAt: row.decided_at,
+    } as Suggestion['actions'][number],
+  }));
+
+const SUGGESTION_COLUMNS = 'id, kind, goal_id, request, title, explanation, assumptions, limitations, sources, period_start, period_end, generator, model, status, generated_at';
+const ACTION_COLUMNS =
+  'id, recommendation_id, action_type, proposed_payload, final_payload, why, approval_status, created_task_id, created_goal_id, created_event_id, created_milestone_id, decided_at, sort_order';
+
+const suggestionSchema = z
+  .object({
+    id: z.string(),
+    kind: z.enum(['weekly_plan', 'goal_breakdown', 'insight_actions', 'request']),
+    goal_id: z.string().nullable(),
+    request: z.string().nullable(),
+    title: z.string(),
+    explanation: z.string(),
+    assumptions: z.string().nullable(),
+    limitations: z.string().nullable(),
+    sources: z.array(z.object({ type: z.enum(['kpi', 'goal', 'task', 'event']), ref: z.string(), label: z.string() })).catch([]),
+    period_start: z.string().nullable(),
+    period_end: z.string().nullable(),
+    generator: z.enum(['ai', 'rules']),
+    model: z.string().nullable(),
+    status: z.enum(['open', 'decided', 'dismissed', 'superseded']),
+    generated_at: z.string(),
+  })
+  .transform(
+    (row): Suggestion => ({
+      id: row.id,
+      kind: row.kind,
+      goalId: row.goal_id,
+      request: row.request,
+      title: row.title,
+      explanation: row.explanation,
+      assumptions: row.assumptions,
+      limitations: row.limitations,
+      sources: row.sources,
+      periodStart: row.period_start,
+      periodEnd: row.period_end,
+      generator: row.generator,
+      model: row.model,
+      status: row.status,
+      generatedAt: row.generated_at,
+      actions: [],
+    }),
+  );
+
+const settingsSchema = z
+  .object({ allow_staff_assignment: z.boolean(), weekly_suggestions: z.boolean(), default_reminder_time: z.string() })
+  .transform((row): PlanSettings => ({ allowStaffAssignment: row.allow_staff_assignment, weeklySuggestions: row.weekly_suggestions, defaultReminderTime: row.default_reminder_time.slice(0, 5) }));
+
+const linkRowSchema = z
+  .object({ id: z.string(), link_type: z.enum(['sale', 'expense', 'product', 'activity', 'kpi']), record_id: z.string().nullable(), kpi_code: z.string().nullable(), label: z.string() })
+  .transform((row): TaskLink => ({ id: row.id, type: row.link_type, recordId: row.record_id, kpiCode: row.kpi_code, label: row.label }));
+
+const measureSchema = z
+  .object({
+    code: z.string(),
+    name: z.string(),
+    unit_kind: z.string(),
+    value: nullableNumeric,
+    status: z.string(),
+    note: z.string().nullable(),
+    period_from: z.string(),
+    period_to: z.string(),
+  })
+  .transform((row): GoalMeasure => ({ code: row.code, name: row.name, unitKind: row.unit_kind, value: row.value, status: row.status, note: row.note, periodFrom: row.period_from, periodTo: row.period_to }));
+
 // Row-level security limits every read and write to members with the plan permissions.
 export class SupabasePlanRepository implements PlanRepository {
   constructor(private readonly client: SupabaseClient) {}
@@ -392,8 +501,17 @@ export class SupabasePlanRepository implements PlanRepository {
     if (added.length > 0) assertSuccess(await this.db.from('task_goals').insert(added.map((goalId) => ({ task_id: taskId, goal_id: goalId, business_id: businessId }))));
   }
 
-  async createTask(businessId: string, input: TaskInput): Promise<string> {
-    const { id } = parseRow(idSchema, await this.db.from('tasks').insert({ business_id: businessId, ...toTaskRow(input) }).select('id').single());
+  async createTask(businessId: string, input: TaskInput, offline?: { clientId: string; recordedAt: string }): Promise<string> {
+    const row = { business_id: businessId, ...toTaskRow(input), ...(offline ? { client_id: offline.clientId, client_recorded_at: offline.recordedAt } : {}) };
+    const response = await this.db.from('tasks').insert(row).select('id').single();
+    // Section 8: sending a captured task again finds the one already made, rather than a copy.
+    if (offline && response.error?.code === '23505') {
+      const { id } = parseRow(idSchema, await this.db.from('tasks').select('id').eq('client_id', offline.clientId).single());
+      const current = (await this.linksFor({ taskId: id })).get(id) ?? [];
+      await this.setGoals(businessId, id, input.goalIds, current);
+      return id;
+    }
+    const { id } = parseRow(idSchema, response);
     await this.setGoals(businessId, id, input.goalIds, []);
     return id;
   }
@@ -505,6 +623,25 @@ export class SupabasePlanRepository implements PlanRepository {
     return parseRow(idSchema, await this.db.from('recurring_rules').insert(row).select('id').single()).id;
   }
 
+  async createEventRule(businessId: string, input: EventRuleInput): Promise<string> {
+    const row = {
+      business_id: businessId,
+      kind: 'event',
+      title: input.title,
+      description: input.description,
+      event_type: input.eventType,
+      start_time: input.startTime,
+      end_time: input.startTime ? input.endTime : null,
+      frequency: input.frequency,
+      interval_count: input.intervalCount,
+      days_of_week: input.frequency === 'weekly' ? input.daysOfWeek : null,
+      day_of_month: input.frequency === 'monthly' ? input.dayOfMonth : null,
+      starts_on: input.startsOn,
+      ends_on: input.endsOn,
+    };
+    return parseRow(idSchema, await this.db.from('recurring_rules').insert(row).select('id').single()).id;
+  }
+
   async updateRule(id: string, input: RuleUpdate): Promise<void> {
     assertSuccess(
       await this.db
@@ -521,6 +658,10 @@ export class SupabasePlanRepository implements PlanRepository {
   async listOccurrences(ruleId: string): Promise<Task[]> {
     const rows = await this.db.from('tasks').select(TASK_COLUMNS).eq('rule_id', ruleId).order('occurrence_on', { ascending: false }).limit(60);
     return parseRows(taskSchema, rows).map((row) => toTask(row, []));
+  }
+
+  async listEventOccurrences(ruleId: string): Promise<PlanEvent[]> {
+    return parseRows(eventSchema, await this.db.from('events').select(EVENT_COLUMNS).eq('rule_id', ruleId).order('starts_on', { ascending: false }).limit(60));
   }
 
   async getEvent(id: string): Promise<PlanEvent> {
@@ -588,5 +729,112 @@ export class SupabasePlanRepository implements PlanRepository {
     } else {
       assertSuccess(await this.db.from('reviews').insert({ business_id: businessId, period_start: period.from, period_end: period.to, ...notes }));
     }
+  }
+
+  private async withActions(suggestions: Suggestion[]): Promise<Suggestion[]> {
+    if (suggestions.length === 0) return suggestions;
+    const rows = parseRows(
+      actionSchema,
+      await this.db
+        .from('recommendation_actions')
+        .select(ACTION_COLUMNS)
+        .in('recommendation_id', suggestions.map((suggestion) => suggestion.id))
+        .order('sort_order'),
+    );
+    return suggestions.map((suggestion) => ({ ...suggestion, actions: rows.filter((row) => row.recommendationId === suggestion.id).map((row) => row.action) }));
+  }
+
+  async listSuggestions(businessId: string): Promise<Suggestion[]> {
+    const rows = parseRows(
+      suggestionSchema,
+      await this.db.from('recommendations').select(SUGGESTION_COLUMNS).eq('business_id', businessId).eq('status', 'open').order('generated_at', { ascending: false }).limit(10),
+    );
+    return this.withActions(rows);
+  }
+
+  async getSuggestion(id: string): Promise<Suggestion> {
+    const [row] = await this.withActions([parseRow(suggestionSchema, await this.db.from('recommendations').select(SUGGESTION_COLUMNS).eq('id', id).single())]);
+    if (!row) throw new AppError('not_found', 'This suggestion could not be found.');
+    return row;
+  }
+
+  async suggestFromRules(businessId: string, kind: SuggestionKind, goalId: string | null, request: string | null): Promise<string | null> {
+    const response = await this.db.rpc('suggest_from_rules', { p_business_id: businessId, p_kind: kind, p_goal_id: goalId, p_request: request });
+    assertSuccess(response);
+    return typeof response.data === 'string' ? response.data : null;
+  }
+
+  async acceptAction(actionId: string, edits: ActionEdits): Promise<string> {
+    const response = await this.db.rpc('accept_action', { p_action_id: actionId, p_edits: edits });
+    assertSuccess(response);
+    return String(response.data);
+  }
+
+  async dismissAction(actionId: string): Promise<void> {
+    assertSuccess(await this.db.rpc('dismiss_action', { p_action_id: actionId }));
+  }
+
+  async dismissSuggestion(id: string): Promise<void> {
+    assertSuccess(await this.db.rpc('dismiss_recommendation', { p_id: id }));
+  }
+
+  async taskOrigin(taskId: string): Promise<{ suggestionId: string; generatedAt: string; generator: 'ai' | 'rules' } | null> {
+    const action = parseOptionalRow(
+      z.object({ recommendation_id: z.string() }),
+      await this.db.from('recommendation_actions').select('recommendation_id').eq('created_task_id', taskId).in('approval_status', ['accepted', 'edited']).limit(1).maybeSingle(),
+    );
+    if (!action) return null;
+    const suggestion = parseOptionalRow(
+      z.object({ generated_at: z.string(), generator: z.enum(['ai', 'rules']) }),
+      await this.db.from('recommendations').select('generated_at, generator').eq('id', action.recommendation_id).maybeSingle(),
+    );
+    return suggestion ? { suggestionId: action.recommendation_id, generatedAt: suggestion.generated_at, generator: suggestion.generator } : null;
+  }
+
+  async getSettings(businessId: string): Promise<PlanSettings> {
+    const [row] = parseRows(settingsSchema, await this.db.rpc('settings_for', { p_business_id: businessId }));
+    if (!row) throw new Error('Plan settings could not be loaded.');
+    return row;
+  }
+
+  async saveSettings(businessId: string, settings: PlanSettings): Promise<void> {
+    assertSuccess(
+      await this.db.rpc('save_settings', {
+        p_business_id: businessId,
+        p_allow_staff_assignment: settings.allowStaffAssignment,
+        p_weekly_suggestions: settings.weeklySuggestions,
+        p_default_reminder_time: settings.defaultReminderTime,
+      }),
+    );
+  }
+
+  async listTaskLinks(taskId: string): Promise<TaskLink[]> {
+    return parseRows(linkRowSchema, await this.db.from('task_links').select('id, link_type, record_id, kpi_code, label').eq('task_id', taskId).order('created_at'));
+  }
+
+  async addTaskLink(businessId: string, taskId: string, target: LinkTarget): Promise<void> {
+    assertSuccess(
+      await this.db.from('task_links').insert({ business_id: businessId, task_id: taskId, link_type: target.type, record_id: target.recordId, kpi_code: target.kpiCode, label: target.label }),
+    );
+  }
+
+  async removeTaskLink(id: string): Promise<void> {
+    assertSuccess(await this.db.from('task_links').delete().eq('id', id));
+  }
+
+  async listGoalKpis(goalId: string): Promise<string[]> {
+    return parseRows(z.object({ kpi_code: z.string() }), await this.db.from('goal_kpis').select('kpi_code').eq('goal_id', goalId)).map((row) => row.kpi_code);
+  }
+
+  async addGoalKpi(businessId: string, goalId: string, kpiCode: string): Promise<void> {
+    assertSuccess(await this.db.from('goal_kpis').insert({ goal_id: goalId, business_id: businessId, kpi_code: kpiCode }));
+  }
+
+  async removeGoalKpi(goalId: string, kpiCode: string): Promise<void> {
+    assertSuccess(await this.db.from('goal_kpis').delete().eq('goal_id', goalId).eq('kpi_code', kpiCode));
+  }
+
+  async goalMeasures(goalId: string): Promise<GoalMeasure[]> {
+    return parseRows(measureSchema, await this.db.rpc('goal_measures', { p_goal_id: goalId }));
   }
 }

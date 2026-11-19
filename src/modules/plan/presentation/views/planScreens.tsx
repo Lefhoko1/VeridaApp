@@ -1,5 +1,5 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Checkbox, Chip, Divider, IconButton, List, Searchbar, Text, TextInput } from 'react-native-paper';
+import { Checkbox, Chip, Divider, IconButton, List, Searchbar, SegmentedButtons, Text, TextInput } from 'react-native-paper';
 
 import { formatDate, formatQuantity } from '@/core/format/format';
 import {
@@ -40,6 +40,7 @@ import {
   useTaskListViewModel,
   type PlanSection,
 } from '../viewmodels/usePlanViewModels';
+import { PendingSyncPanel, SuggestionsPanel } from './assistScreens';
 import { GOAL_TONES, GoalCards, TASK_TONES, TaskRows, formatDateTime } from './planParts';
 import { ProgressSection, ScheduleSection } from './scheduleScreens';
 
@@ -53,6 +54,10 @@ export type PlanScreenProps = {
   onOpenEvent: (id: string) => void;
   onOpenSeries: (id: string) => void;
   onOpenReview: (weekStart: string) => void;
+  // Section 4.6: asking Verida for suggestions, and opening one.
+  onAssist: () => void;
+  onOpenSuggestion: (id: string) => void;
+  onOpenSettings: () => void;
 };
 
 // Section 1.2: Overview, Goals, Tasks, Schedule and Progress. Chips scroll sideways, so five
@@ -87,7 +92,7 @@ export function PlanScreen(props: PlanScreenProps) {
   }
 }
 
-function PlanOverview({ header, onNewTask, onNewGoal, onOpenTask, onOpenGoal, onOpenEvent, onShowSchedule }: PlanScreenProps & { header: React.ReactNode; onShowSchedule: () => void }) {
+function PlanOverview({ header, onNewTask, onNewGoal, onOpenTask, onOpenGoal, onOpenEvent, onShowSchedule, onAssist, onOpenSuggestion, onOpenSettings }: PlanScreenProps & { header: React.ReactNode; onShowSchedule: () => void }) {
   const vm = usePlanOverviewViewModel();
   if (!vm.canView) return <Screen>{header}<Notice tone="info">You do not have access to this business&apos;s plan.</Notice></Screen>;
   if (vm.loading) return <Screen>{header}<LoadingView /></Screen>;
@@ -108,7 +113,18 @@ function PlanOverview({ header, onNewTask, onNewGoal, onOpenTask, onOpenGoal, on
             New goal
           </Button>
         ) : null}
+        {vm.canCreateTask ? (
+          <Button mode="outlined" icon="creation-outline" onPress={onAssist}>
+            Plan with Verida
+          </Button>
+        ) : null}
+        {vm.canManageSettings ? (
+          <Button icon="cog-outline" onPress={onOpenSettings}>
+            Plan settings
+          </Button>
+        ) : null}
       </Row>
+      <PendingSyncPanel sync={vm.sync} />
       <MetricGrid>
         <MetricCard index={0} label="Open tasks" value={formatQuantity(n?.openTasks ?? 0)} />
         <MetricCard index={1} label="Active goals" value={formatQuantity(n?.activeGoals ?? 0)} />
@@ -121,10 +137,15 @@ function PlanOverview({ header, onNewTask, onNewGoal, onOpenTask, onOpenGoal, on
         />
       </MetricGrid>
 
+      <Button compact icon={vm.mineOnly ? 'account-check' : 'account-multiple-outline'} onPress={vm.toggleMine}>
+        {vm.mineOnly ? 'Showing my tasks only' : 'Showing everyone’s tasks'}
+      </Button>
       <Panel style={styles.list}>
         <SectionHeader title="Today's focus" description="Overdue and due today first, then by priority." />
         <TaskRows items={vm.focus} onOpen={onOpenTask} empty="Nothing due. Add a task, or look at what is coming up." />
       </Panel>
+
+      <SuggestionsPanel onAssist={onAssist} onOpenSuggestion={onOpenSuggestion} />
 
       <Panel style={styles.list}>
         <SectionHeader title="Active goals" />
@@ -134,13 +155,13 @@ function PlanOverview({ header, onNewTask, onNewGoal, onOpenTask, onOpenGoal, on
       <Panel style={styles.list}>
         <SectionHeader
           title="Coming up"
-          description="Due in the next 7 days."
           action={
             <Button compact icon="calendar-month-outline" onPress={onShowSchedule}>
               View schedule
             </Button>
           }
         />
+        <SegmentedButtons value={vm.span} onValueChange={vm.setSpan} buttons={vm.spans} density="small" />
         {vm.events.map((event) => (
           <List.Item
             key={event.id}
@@ -150,7 +171,7 @@ function PlanOverview({ header, onNewTask, onNewGoal, onOpenTask, onOpenGoal, on
             onPress={() => onOpenEvent(event.id)}
           />
         ))}
-        <TaskRows items={vm.upcoming} onOpen={onOpenTask} empty={vm.events.length > 0 ? '' : 'Nothing due this week.'} />
+        <TaskRows items={vm.upcoming} onOpen={onOpenTask} empty={vm.events.length > 0 ? '' : vm.span === 'today' ? 'Nothing due today.' : vm.span === 'tomorrow' ? 'Nothing due tomorrow.' : 'Nothing due this week.'} />
       </Panel>
     </Screen>
   );
@@ -177,7 +198,10 @@ function TaskList({ header, onNewTask, onOpenTask }: PlanScreenProps & { header:
         <SelectField label="Show" value={vm.filter} options={TASK_FILTERS} onChange={vm.setFilter} />
         <SelectField label="Priority" value={vm.priority} options={vm.priorityOptions} onChange={vm.setPriority} />
         <SelectField label="Assigned to" value={vm.assignee} options={vm.assigneeOptions} onChange={vm.setAssignee} />
+        <DateField label="Due from (optional)" value={vm.dueFrom} onChangeText={vm.setDueFrom} />
+        <DateField label="Due until (optional)" value={vm.dueTo} onChangeText={vm.setDueTo} />
       </FieldGrid>
+      <PendingSyncPanel sync={vm.sync} />
       <Searchbar placeholder="Search tasks" value={vm.search} onChangeText={vm.setSearch} style={styles.search} />
       {vm.loading ? (
         <LoadingView />
@@ -224,10 +248,10 @@ function GoalList({ header, onNewGoal, onOpenGoal }: PlanScreenProps & { header:
   );
 }
 
-type TaskFormProps = { taskId?: string; goalId?: string; onDone: (id: string) => void; onSeriesCreated?: (ruleId: string) => void };
+type TaskFormProps = { taskId?: string; goalId?: string; onDone: (id: string) => void; onSeriesCreated?: (ruleId: string) => void; onQueued?: () => void };
 
-export function TaskFormScreen({ taskId, goalId, onDone, onSeriesCreated }: TaskFormProps) {
-  const vm = useTaskFormViewModel({ taskId, goalId, onDone, onSeriesCreated });
+export function TaskFormScreen({ taskId, goalId, onDone, onSeriesCreated, onQueued }: TaskFormProps) {
+  const vm = useTaskFormViewModel({ taskId, goalId, onDone, onSeriesCreated, onQueued });
   if (vm.loading) return <LoadingView />;
   if (vm.loadError) return <ErrorView message={vm.loadError} />;
   const { values, errors, setValue } = vm.form;
@@ -263,7 +287,8 @@ export function TaskFormScreen({ taskId, goalId, onDone, onSeriesCreated }: Task
         <FieldGrid>
           {vm.repeating ? null : <DateField label="Due date (optional)" value={values.dueOn} onChangeText={(v) => setValue('dueOn', v)} error={errors.dueOn} />}
           <SelectField label="Priority" value={values.priority} options={vm.priorityOptions} onChange={(v) => setValue('priority', v as TaskPriority)} />
-          <SelectField label="Assigned to" value={values.assignedTo} options={vm.assigneeOptions} onChange={(v) => setValue('assignedTo', v)} />
+          <SelectField label="Assigned to" value={values.assignedTo} options={vm.assigneeOptions} onChange={(v) => setValue('assignedTo', v)} hint={vm.assigneeHint} />
+          {vm.canRemind && !vm.repeating && values.dueOn ? <SelectField label="Remind me" value={vm.reminder} options={vm.reminderOptions} onChange={vm.setReminder} /> : null}
           {vm.isEditing ? <SelectField label="Status" value={values.status} options={vm.statusOptions} onChange={(v) => setValue('status', v as TaskStatus)} /> : null}
         </FieldGrid>
         {values.status === 'blocked' ? <FormField label="What is blocking it?" value={values.blockerReason} onChangeText={(v) => setValue('blockerReason', v)} error={errors.blockerReason} /> : null}
@@ -301,9 +326,9 @@ export function TaskFormScreen({ taskId, goalId, onDone, onSeriesCreated }: Task
   );
 }
 
-type TaskProfileProps = { taskId: string; onEdit: () => void; onOpenGoal: (id: string) => void; onOpenSeries: (id: string) => void };
+type TaskProfileProps = { taskId: string; onEdit: () => void; onOpenGoal: (id: string) => void; onOpenSeries: (id: string) => void; onOpenSuggestion: (id: string) => void };
 
-export function TaskProfileScreen({ taskId, onEdit, onOpenGoal, onOpenSeries }: TaskProfileProps) {
+export function TaskProfileScreen({ taskId, onEdit, onOpenGoal, onOpenSeries, onOpenSuggestion }: TaskProfileProps) {
   const vm = useTaskDetailViewModel(taskId);
   if (vm.loading) return <LoadingView />;
   if (vm.error || !vm.task) return <ErrorView message={vm.error ?? 'This task could not be found.'} />;
@@ -319,6 +344,7 @@ export function TaskProfileScreen({ taskId, onEdit, onOpenGoal, onOpenSeries }: 
         struckThrough={task.status === 'cancelled'}
         status={{ label: vm.statusLabel, tone: TASK_TONES[task.status] }}
       />
+      {vm.pendingSync ? <Notice title="Waiting to sync">A change made without a connection is saved on this device and will be sent when you are back online.</Notice> : null}
       {vm.overdue ? <Notice title="Overdue">{`This was due on ${formatDate(task.dueOn ?? '')}.`}</Notice> : null}
       {task.status === 'blocked' && task.blockerReason ? <Notice title="Blocked">{task.blockerReason}</Notice> : null}
       <DetailPanel
@@ -330,6 +356,11 @@ export function TaskProfileScreen({ taskId, onEdit, onOpenGoal, onOpenSeries }: 
           { label: 'Details', value: task.description },
         ]}
       />
+      {vm.origin ? (
+        <Panel style={styles.list}>
+          <List.Item title={vm.origin.label} left={(p) => <List.Icon {...p} icon="creation-outline" />} right={(p) => <List.Icon {...p} icon="chevron-right" />} onPress={() => onOpenSuggestion(vm.origin?.suggestionId ?? '')} />
+        </Panel>
+      ) : null}
       {vm.series ? (
         <Panel style={styles.list}>
           <List.Item
@@ -381,6 +412,7 @@ export function TaskProfileScreen({ taskId, onEdit, onOpenGoal, onOpenSeries }: 
           Cancel this task
         </Button>
       ) : null}
+      <TaskLinks vm={vm} />
       <TaskReminders vm={vm} />
       <TaskComments vm={vm} />
       <TaskHistory vm={vm} />
@@ -399,6 +431,46 @@ export function TaskProfileScreen({ taskId, onEdit, onOpenGoal, onOpenSeries }: 
 }
 
 type TaskDetail = ReturnType<typeof useTaskDetailViewModel>;
+
+// Section 4.3: the records a task is about. A link names the record and never copies an amount.
+function TaskLinks({ vm }: { vm: TaskDetail }) {
+  if (!vm.canLink && vm.links.length === 0) return null;
+  return (
+    <Panel style={styles.list}>
+      <SectionHeader title="Related records" />
+      {vm.links.length === 0 ? <Text style={styles.muted}>Not linked to any record.</Text> : null}
+      {vm.links.map((link) => (
+        <List.Item
+          key={link.id}
+          title={link.label}
+          description={link.typeLabel}
+          right={() => (vm.canLink ? <IconButton icon="close" size={18} onPress={() => vm.removeLink(link.id)} accessibilityLabel={`Remove the link to ${link.label}`} /> : null)}
+        />
+      ))}
+      {vm.canLink ? (
+        <View style={styles.inset}>
+          <FieldGrid>
+            <SelectField label="Link to" value={vm.linkType} options={vm.linkTypeOptions} onChange={vm.setLinkType} />
+            {vm.linkType ? (
+              <SelectField
+                label="Record"
+                value={vm.linkChoice}
+                options={vm.linkChoiceOptions}
+                onChange={vm.setLinkChoice}
+                hint={vm.linkOptionsLoading ? 'Loading…' : vm.linkChoiceOptions.length === 0 ? 'Nothing recent to link.' : undefined}
+              />
+            ) : null}
+          </FieldGrid>
+          {vm.linkType ? (
+            <Button mode="outlined" icon="link-variant" onPress={vm.addLink} loading={vm.addingLink} disabled={vm.addingLink || !vm.linkChoice}>
+              Add link
+            </Button>
+          ) : null}
+        </View>
+      ) : null}
+    </Panel>
+  );
+}
 
 // Section 9: each person's own reminders. Snoozing or dismissing never moves the due date.
 function TaskReminders({ vm }: { vm: TaskDetail }) {
@@ -564,9 +636,9 @@ export function GoalFormScreen({ goalId, onDone }: { goalId?: string; onDone: (i
   );
 }
 
-type GoalProfileProps = { goalId: string; onEdit: () => void; onOpenTask: (id: string) => void; onAddTask: () => void };
+type GoalProfileProps = { goalId: string; onEdit: () => void; onOpenTask: (id: string) => void; onAddTask: () => void; onAssist: () => void };
 
-export function GoalProfileScreen({ goalId, onEdit, onOpenTask, onAddTask }: GoalProfileProps) {
+export function GoalProfileScreen({ goalId, onEdit, onOpenTask, onAddTask, onAssist }: GoalProfileProps) {
   const vm = useGoalDetailViewModel(goalId);
   if (vm.loading) return <LoadingView />;
   if (vm.error || !vm.goal) return <ErrorView message={vm.error ?? 'This goal could not be found.'} />;
@@ -609,6 +681,28 @@ export function GoalProfileScreen({ goalId, onEdit, onOpenTask, onAddTask }: Goa
           </Button>
         </Panel>
       ) : null}
+
+      <Panel style={styles.list}>
+        <SectionHeader title="Related measures" description="Figures from your records over the goal's period so far. They give context; they do not prove what moved the goal." />
+        {vm.measures.length === 0 ? <Text style={styles.muted}>No related measures yet.</Text> : null}
+        {vm.measures.map((measure) => (
+          <List.Item
+            key={measure.code}
+            title={`${measure.name}: ${measure.display}${measure.estimated ? ' (estimated)' : ''}`}
+            description={[measure.period, measure.note].filter(Boolean).join(' · ')}
+            descriptionNumberOfLines={3}
+            right={() => (vm.canManage ? <IconButton icon="close" size={18} onPress={() => vm.removeMeasure(measure.code)} accessibilityLabel={`Remove ${measure.name}`} /> : null)}
+          />
+        ))}
+        {vm.canManage && vm.measureOptions.length > 0 ? (
+          <View style={styles.inset}>
+            <SelectField label="Add a measure" value={vm.measureChoice} options={vm.measureOptions} onChange={vm.setMeasureChoice} />
+            <Button mode="outlined" onPress={vm.addMeasure} disabled={!vm.measureChoice}>
+              Add measure
+            </Button>
+          </View>
+        ) : null}
+      </Panel>
 
       {vm.measurable && vm.observations.length > 0 ? (
         <Panel style={styles.list}>
@@ -659,9 +753,14 @@ export function GoalProfileScreen({ goalId, onEdit, onOpenTask, onAddTask }: Goa
           title="Tasks for this goal"
           action={
             vm.canAddTask ? (
-              <Button compact icon="plus" onPress={onAddTask}>
-                Add task
-              </Button>
+              <Row gap={spacing.xs}>
+                <Button compact icon="creation-outline" onPress={onAssist}>
+                  Break into steps
+                </Button>
+                <Button compact icon="plus" onPress={onAddTask}>
+                  Add task
+                </Button>
+              </Row>
             ) : undefined
           }
         />

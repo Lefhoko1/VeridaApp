@@ -111,7 +111,7 @@ describe('repeating tasks', () => {
 });
 
 describe('events', () => {
-  const event = { title: 'Feed delivery', description: '', eventType: 'delivery', startsOn: '2026-11-20', startTime: '', endTime: '', status: 'scheduled' };
+  const event = { title: 'Feed delivery', description: '', eventType: 'delivery', startsOn: '2026-11-20', startTime: '', endTime: '', status: 'scheduled', repeat: 'none', intervalCount: '1', daysOfWeek: '', dayOfMonth: '', endsOn: '' };
 
   it('accepts all-day events and checks times', () => {
     expect(eventFormSchema.safeParse(event).success).toBe(true);
@@ -119,6 +119,8 @@ describe('events', () => {
     expect(eventFormSchema.safeParse({ ...event, startTime: '09:30', endTime: '09:00' }).success).toBe(false);
     expect(eventFormSchema.safeParse({ ...event, endTime: '10:00' }).success).toBe(false);
     expect(eventFormSchema.parse({ ...event, startTime: '09:30', endTime: '10:15' })).toMatchObject({ startTime: '09:30', endTime: '10:15' });
+    expect(eventFormSchema.safeParse({ ...event, repeat: 'weekly' }).success).toBe(false);
+    expect(eventFormSchema.parse({ ...event, repeat: 'weekly', daysOfWeek: '6' })).toMatchObject({ repeat: 'weekly', daysOfWeek: [6], intervalCount: 1 });
   });
 });
 

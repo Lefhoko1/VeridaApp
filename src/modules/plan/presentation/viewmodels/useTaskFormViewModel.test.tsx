@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 import type { ReactNode } from 'react';
 
+import type { OutboxItem, PlanOutbox } from '../../domain/assist';
 import type { Task } from '../../domain/models';
 import type { PlanRepository } from '../../domain/repositories';
 import type { RecurringRule } from '../../domain/schedule';
@@ -48,6 +49,10 @@ const RULE: RecurringRule = {
   startsOn: '2026-11-19',
   endsOn: null,
   status: 'active',
+  kind: 'task',
+  eventType: null,
+  startTime: null,
+  endTime: null,
 };
 
 function fakePlan(overrides: Partial<PlanRepository> = {}): PlanRepository {
@@ -70,11 +75,27 @@ function fakePlan(overrides: Partial<PlanRepository> = {}): PlanRepository {
   ) as PlanRepository;
 }
 
+const noLinks = { sales: async () => [], expenses: async () => [], products: async () => [], activities: async () => [] };
+
+// An in-memory stand-in for the device's store of changes made offline.
+function memoryOutbox(): PlanOutbox {
+  let items: OutboxItem[] = [];
+  return {
+    list: async () => items,
+    put: async (_scope, item) => {
+      items = [...items.filter((existing) => existing.clientId !== item.clientId), item];
+    },
+    remove: async (_scope, clientId) => {
+      items = items.filter((existing) => existing.clientId !== clientId);
+    },
+  };
+}
+
 function setup(plan: PlanRepository) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity }, mutations: { gcTime: Infinity } } });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>
-      <PlanDependenciesProvider value={{ plan }}>{children}</PlanDependenciesProvider>
+      <PlanDependenciesProvider value={{ plan, advisor: { suggest: jest.fn() }, outbox: memoryOutbox(), links: noLinks }}>{children}</PlanDependenciesProvider>
     </QueryClientProvider>
   );
   return { wrapper, onDone: jest.fn(), onSeriesCreated: jest.fn() };

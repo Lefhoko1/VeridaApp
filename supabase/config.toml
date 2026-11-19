@@ -26,6 +26,9 @@ import_map = "./functions/import_map.json"
 [functions.read-receipt]
 import_map = "./functions/import_map.json"
 
+[functions.plan-assist]
+import_map = "./functions/import_map.json"
+
 [functions.dispatch-email]
 import_map = "./functions/import_map.json"
 # Only drains the email queue, and the scheduler has no user to authenticate as.

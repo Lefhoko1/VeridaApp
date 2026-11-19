@@ -103,9 +103,20 @@ export type RecurringRule = {
   startsOn: string;
   endsOn: string | null;
   status: 'active' | 'ended';
+  kind: 'task' | 'event';
+  eventType: EventType | null;
+  startTime: string | null;
+  endTime: string | null;
 };
 
-export type RuleInput = Omit<RecurringRule, 'id' | 'status'>;
+export type RuleInput = Omit<RecurringRule, 'id' | 'status' | 'kind' | 'eventType' | 'startTime' | 'endTime'>;
+
+// Section 4.4: a repeating event, such as a weekly market day.
+export type EventRuleInput = Pick<RecurringRule, 'title' | 'description' | 'frequency' | 'intervalCount' | 'daysOfWeek' | 'dayOfMonth' | 'startsOn' | 'endsOn'> & {
+  eventType: EventType;
+  startTime: string | null;
+  endTime: string | null;
+};
 // What can change once a series exists. A different pattern is a new series.
 export type RuleUpdate = Pick<RecurringRule, 'title' | 'description' | 'priority' | 'assignedTo' | 'endsOn'>;
 
@@ -156,9 +167,11 @@ export type PlanEvent = {
   endTime: string | null;
   status: EventStatus;
   version: number;
+  // Set when the event is one occurrence of a repeating series.
+  ruleId: string | null;
 };
 
-export type EventInput = Omit<PlanEvent, 'id' | 'version'>;
+export type EventInput = Omit<PlanEvent, 'id' | 'version' | 'ruleId'>;
 
 export const timeRange = (start: string | null, end: string | null) => (start ? (end ? `${start}–${end}` : start) : 'All day');
 

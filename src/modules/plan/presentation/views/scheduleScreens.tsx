@@ -13,6 +13,7 @@ import {
   FieldGrid,
   FormField,
   LoadingView,
+  MultiSelectField,
   Notice,
   Panel,
   ProfileHeader,
@@ -237,8 +238,10 @@ export function ProgressSection({ header, onOpenGoal, onOpenReview }: SectionPro
 // ---------------------------------------------------------------------------------------------
 // Events.
 
-export function EventFormScreen({ eventId, onDate, onDone }: { eventId?: string; onDate?: string; onDone: (id: string) => void }) {
-  const vm = useEventFormViewModel({ eventId, onDate, onDone });
+type EventFormProps = { eventId?: string; onDate?: string; onDone: (id: string) => void; onSeriesCreated?: (ruleId: string) => void };
+
+export function EventFormScreen({ eventId, onDate, onDone, onSeriesCreated }: EventFormProps) {
+  const vm = useEventFormViewModel({ eventId, onDate, onDone, onSeriesCreated });
   if (vm.loading) return <LoadingView />;
   if (vm.loadError) return <ErrorView message={vm.loadError} />;
   const { values, errors, setValue } = vm.form;
@@ -254,18 +257,40 @@ export function EventFormScreen({ eventId, onDate, onDone }: { eventId?: string;
           {vm.isEditing ? <SelectField label="Status" value={values.status} options={vm.statusOptions} onChange={(v) => setValue('status', v)} /> : null}
         </FieldGrid>
         <Text style={partStyles.muted}>Times are in your business&apos;s own time zone. Leave them empty for an all-day event.</Text>
+        {vm.canRepeat ? <SelectField label="Repeats" value={values.repeat} options={vm.repeatOptions} onChange={vm.setRepeat} /> : null}
+        {values.repeat !== 'none' ? (
+          <>
+            <FieldGrid>
+              <FormField
+                label={values.repeat === 'daily' ? 'Every how many days' : values.repeat === 'weekly' ? 'Every how many weeks' : 'Every how many months'}
+                value={values.intervalCount}
+                onChangeText={(v) => setValue('intervalCount', v)}
+                error={errors.intervalCount}
+                keyboardType="number-pad"
+              />
+              {values.repeat === 'monthly' ? (
+                <FormField label="Day of the month" value={values.dayOfMonth} onChangeText={(v) => setValue('dayOfMonth', v)} error={errors.dayOfMonth} keyboardType="number-pad" />
+              ) : null}
+              <DateField label="Ends on (optional)" value={values.endsOn} onChangeText={(v) => setValue('endsOn', v)} error={errors.endsOn} />
+            </FieldGrid>
+            {values.repeat === 'weekly' ? (
+              <MultiSelectField label="On these days" values={vm.chosenWeekdays} options={vm.weekdayOptions} onChange={vm.setWeekdays} allowOther={false} allLabel="" emptyText="Choose days" error={errors.daysOfWeek} />
+            ) : null}
+            {vm.repeatSummary ? <Text style={partStyles.muted}>{`${vm.repeatSummary}, starting on the day above.`}</Text> : null}
+          </>
+        ) : null}
         <FormField label="Details (optional)" value={values.description} onChangeText={(v) => setValue('description', v)} error={errors.description} multiline />
       </Panel>
       {vm.canSave ? (
         <Button mode="contained" onPress={vm.submit} loading={vm.saving} disabled={vm.saving}>
-          {vm.isEditing ? 'Save changes' : 'Add to schedule'}
+          {vm.isEditing ? 'Save changes' : values.repeat !== 'none' ? 'Add repeating event' : 'Add to schedule'}
         </Button>
       ) : null}
     </Screen>
   );
 }
 
-export function EventProfileScreen({ eventId, onEdit }: { eventId: string; onEdit: () => void }) {
+export function EventProfileScreen({ eventId, onEdit, onOpenSeries }: { eventId: string; onEdit: () => void; onOpenSeries: (id: string) => void }) {
   const vm = useEventDetailViewModel(eventId);
   if (vm.loading) return <LoadingView />;
   if (vm.error || !vm.event) return <ErrorView message={vm.error ?? 'This event could not be found.'} />;
@@ -287,6 +312,11 @@ export function EventProfileScreen({ eventId, onEdit }: { eventId: string; onEdi
           { label: 'Details', value: event.description },
         ]}
       />
+      {event.ruleId ? (
+        <Panel style={styles.list}>
+          <List.Item title="Repeating event" description="See the whole series" left={(p) => <List.Icon {...p} icon="repeat" />} right={(p) => <List.Icon {...p} icon="chevron-right" />} onPress={() => onOpenSeries(event.ruleId ?? '')} />
+        </Panel>
+      ) : null}
       <Row wrap>
         {vm.canMarkDone ? (
           <Button mode="contained" icon="check" onPress={vm.markDone} disabled={vm.busy}>
@@ -316,7 +346,7 @@ export function EventProfileScreen({ eventId, onEdit }: { eventId: string; onEdi
 // ---------------------------------------------------------------------------------------------
 // Repeating series.
 
-export function SeriesProfileScreen({ ruleId, onEdit, onOpenTask }: { ruleId: string; onEdit: () => void; onOpenTask: (id: string) => void }) {
+export function SeriesProfileScreen({ ruleId, onEdit, onOpenTask, onOpenEvent }: { ruleId: string; onEdit: () => void; onOpenTask: (id: string) => void; onOpenEvent: (id: string) => void }) {
   const vm = useSeriesDetailViewModel(ruleId);
   if (vm.loading) return <LoadingView />;
   if (vm.error || !vm.rule) return <ErrorView message={vm.error ?? 'This repeating task could not be found.'} />;
@@ -328,17 +358,27 @@ export function SeriesProfileScreen({ ruleId, onEdit, onOpenTask }: { ruleId: st
         rows={[
           { label: 'Starts', value: formatDate(rule.startsOn), half: true },
           { label: 'Ends', value: rule.endsOn ? formatDate(rule.endsOn) : 'No end date', half: true },
-          { label: 'Priority', value: vm.priorityLabel, half: true },
-          { label: 'Assigned to', value: vm.assignee ?? 'Nobody yet', half: true },
+          { label: 'Priority', value: vm.isEventSeries ? null : vm.priorityLabel, half: true },
+          { label: 'Assigned to', value: vm.isEventSeries ? null : (vm.assignee ?? 'Nobody yet'), half: true },
           { label: 'Details', value: rule.description },
         ]}
       />
-      <Notice tone="info">Each time becomes its own task about a week ahead, so completing or changing one never affects the others.</Notice>
-      <Panel style={styles.list}>
-        <SectionHeader title="Coming up" />
-        <TaskRows items={vm.upcoming} onOpen={onOpenTask} empty="Nothing open yet." />
-      </Panel>
-      {vm.past.length > 0 ? (
+      <Notice tone="info">{`Each time becomes its own ${vm.isEventSeries ? 'event' : 'task'} about a week ahead, so changing one never affects the others.`}</Notice>
+      {vm.isEventSeries ? (
+        <Panel style={styles.list}>
+          <SectionHeader title={`Events · ${vm.eventWhen}`} />
+          {vm.events.length === 0 ? <Text style={partStyles.muted}>None yet.</Text> : null}
+          {vm.events.map((event) => (
+            <List.Item key={event.id} title={formatDate(event.startsOn)} description={`${event.when} · ${event.statusLabel}`} titleStyle={event.past ? partStyles.struck : undefined} onPress={() => onOpenEvent(event.id)} />
+          ))}
+        </Panel>
+      ) : (
+        <Panel style={styles.list}>
+          <SectionHeader title="Coming up" />
+          <TaskRows items={vm.upcoming} onOpen={onOpenTask} empty="Nothing open yet." />
+        </Panel>
+      )}
+      {!vm.isEventSeries && vm.past.length > 0 ? (
         <Panel style={styles.list}>
           <SectionHeader title="Earlier" />
           <TaskRows items={vm.past} onOpen={onOpenTask} empty="" />
@@ -357,7 +397,7 @@ export function SeriesProfileScreen({ ruleId, onEdit, onOpenTask }: { ruleId: st
       <ConfirmDialog
         visible={vm.confirmingEnd}
         title="Stop repeating this task?"
-        message="Tasks after today that nobody has started or changed are cancelled. Today's task and everything already done stay as they are."
+        message="Later ones that nobody has started or changed are cancelled. Today's and everything already done stay as they are."
         confirmLabel="Stop repeating"
         destructive
         busy={vm.ending}
@@ -379,8 +419,8 @@ export function SeriesFormScreen({ ruleId, onDone }: { ruleId: string; onDone: (
       <Panel>
         <FormField label="What needs doing?" value={values.title} onChangeText={(v) => setValue('title', v)} error={errors.title} />
         <FieldGrid>
-          <SelectField label="Priority" value={values.priority} options={vm.priorityOptions} onChange={(v) => setValue('priority', v)} />
-          <SelectField label="Assigned to" value={values.assignedTo} options={vm.assigneeOptions} onChange={(v) => setValue('assignedTo', v)} />
+          {vm.isEventSeries ? null : <SelectField label="Priority" value={values.priority} options={vm.priorityOptions} onChange={(v) => setValue('priority', v)} />}
+          {vm.isEventSeries ? null : <SelectField label="Assigned to" value={values.assignedTo} options={vm.assigneeOptions} onChange={(v) => setValue('assignedTo', v)} />}
           <DateField label="Ends on (optional)" value={values.endsOn} onChangeText={(v) => setValue('endsOn', v)} error={errors.endsOn} />
         </FieldGrid>
         <FormField label="Details (optional)" value={values.description} onChangeText={(v) => setValue('description', v)} error={errors.description} multiline />

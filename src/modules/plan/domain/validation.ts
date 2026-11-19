@@ -22,6 +22,37 @@ export const ruleFields = {
   defaults: { repeat: 'none', intervalCount: '1', daysOfWeek: '', dayOfMonth: '', startsOn: '', endsOn: '' },
 };
 
+type RepeatValues = { repeat: string; intervalCount: string; daysOfWeek: number[]; dayOfMonth: string; startsOn: string | null; endsOn: string | null };
+
+// Section 4.4: a repeating task or event needs a sensible pattern.
+function checkRepeat(values: RepeatValues, context: z.RefinementCtx) {
+  if (values.repeat === 'none') return;
+  const every = Number(values.intervalCount);
+  if (!Number.isInteger(every) || every < 1 || every > 52) {
+    context.addIssue({ code: 'custom', path: ['intervalCount'], message: 'Enter a whole number from 1 to 52.' });
+  }
+  if (values.repeat === 'weekly' && values.daysOfWeek.length === 0) {
+    context.addIssue({ code: 'custom', path: ['daysOfWeek'], message: 'Choose at least one day.' });
+  }
+  const day = Number(values.dayOfMonth);
+  if (values.repeat === 'monthly' && (!Number.isInteger(day) || day < 1 || day > 31)) {
+    context.addIssue({ code: 'custom', path: ['dayOfMonth'], message: 'Enter a day from 1 to 31.' });
+  }
+  if (!values.startsOn) {
+    context.addIssue({ code: 'custom', path: ['startsOn'], message: 'Choose when it starts.' });
+  } else if (values.endsOn && values.endsOn < values.startsOn) {
+    context.addIssue({ code: 'custom', path: ['endsOn'], message: 'The end cannot be before the start.' });
+  }
+}
+
+const repeatShape = {
+  repeat: z.enum(['none', 'daily', 'weekly', 'monthly']),
+  intervalCount: z.string().trim(),
+  daysOfWeek: z.string().transform((value) => value.split(',').filter(Boolean).map(Number)),
+  dayOfMonth: z.string().trim(),
+  endsOn: optionalDate,
+};
+
 // Section 4.3 and journey 5.1: a title is enough, and the rest is asked for progressively.
 export const taskFormSchema = z
   .object({
@@ -35,34 +66,14 @@ export const taskFormSchema = z
     assignedTo: z.string().transform(emptyToNull),
     // Several goals, held as one comma-separated value while the form is open.
     goalIds: z.string().transform((value) => value.split(',').filter(Boolean)),
-    repeat: z.enum(['none', 'daily', 'weekly', 'monthly']),
-    intervalCount: z.string().trim(),
-    daysOfWeek: z.string().transform((value) => value.split(',').filter(Boolean).map(Number)),
-    dayOfMonth: z.string().trim(),
+    ...repeatShape,
     startsOn: optionalDate,
-    endsOn: optionalDate,
   })
   .superRefine((task, context) => {
     if (task.status === 'blocked' && !task.blockerReason) {
       context.addIssue({ code: 'custom', path: ['blockerReason'], message: 'Say what is blocking the task.' });
     }
-    if (task.repeat === 'none') return;
-    const every = Number(task.intervalCount);
-    if (!Number.isInteger(every) || every < 1 || every > 52) {
-      context.addIssue({ code: 'custom', path: ['intervalCount'], message: 'Enter a whole number from 1 to 52.' });
-    }
-    if (task.repeat === 'weekly' && task.daysOfWeek.length === 0) {
-      context.addIssue({ code: 'custom', path: ['daysOfWeek'], message: 'Choose at least one day.' });
-    }
-    const day = Number(task.dayOfMonth);
-    if (task.repeat === 'monthly' && (!Number.isInteger(day) || day < 1 || day > 31)) {
-      context.addIssue({ code: 'custom', path: ['dayOfMonth'], message: 'Enter a day from 1 to 31.' });
-    }
-    if (!task.startsOn) {
-      context.addIssue({ code: 'custom', path: ['startsOn'], message: 'Choose when it starts.' });
-    } else if (task.endsOn && task.endsOn < task.startsOn) {
-      context.addIssue({ code: 'custom', path: ['endsOn'], message: 'The end cannot be before the start.' });
-    }
+    checkRepeat(task, context);
   })
   .transform((task) => ({
     ...task,
@@ -92,14 +103,17 @@ export const eventFormSchema = z
     startTime: optionalTime,
     endTime: optionalTime,
     status: z.enum(['scheduled', 'done', 'cancelled']),
+    ...repeatShape,
   })
   .superRefine((event, context) => {
+    checkRepeat({ ...event, startsOn: event.startsOn }, context);
     if (event.endTime && !event.startTime) {
       context.addIssue({ code: 'custom', path: ['startTime'], message: 'Add a start time, or leave both empty for all day.' });
     } else if (event.endTime && event.startTime && event.endTime <= event.startTime) {
       context.addIssue({ code: 'custom', path: ['endTime'], message: 'The end must be after the start.' });
     }
-  });
+  })
+  .transform((event) => ({ ...event, intervalCount: Number(event.intervalCount) || 1, dayOfMonth: event.repeat === 'monthly' ? Number(event.dayOfMonth) : null }));
 
 export const reminderFormSchema = z.object({
   on: dateField,

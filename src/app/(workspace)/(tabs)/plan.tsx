@@ -13,6 +13,9 @@ export default function PlanRoute() {
       onOpenEvent={(id) => router.push({ pathname: '/events/[id]', params: { id } })}
       onOpenSeries={(id) => router.push({ pathname: '/series/[id]', params: { id } })}
       onOpenReview={(week) => router.push({ pathname: '/reviews/[week]', params: { week } })}
+      onAssist={() => router.push('/assist')}
+      onOpenSuggestion={(id) => router.push({ pathname: '/suggestions/[id]', params: { id } })}
+      onOpenSettings={() => router.push('/plan-settings')}
     />
   );
 }

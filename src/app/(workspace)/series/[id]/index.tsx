@@ -9,6 +9,7 @@ export default function SeriesRoute() {
       ruleId={id}
       onEdit={() => router.push({ pathname: '/series/[id]/edit', params: { id } })}
       onOpenTask={(task) => router.push({ pathname: '/tasks/[id]', params: { id: task } })}
+      onOpenEvent={(event) => router.push({ pathname: '/events/[id]', params: { id: event } })}
     />
   );
 }

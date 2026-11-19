@@ -57,7 +57,8 @@ describe('plan schedule and collaboration', () => {
       const [{ dates }] = (
         await db.query(
           `select array_agg(d::text order by d) as dates
-             from plan.rule_dates(row(null, null, 't', null, 'normal', null, 'weekly', 2, array[1, 4], null, $1::date, null, $1::date, 'active', 1, now(), null, now(), null)::plan.recurring_rules,
+             from plan.rule_dates(jsonb_populate_record(null::plan.recurring_rules,
+                                    jsonb_build_object('frequency', 'weekly', 'interval_count', 2, 'days_of_week', array[1, 4], 'starts_on', $1::date)),
                                   $1::date, '2026-02-01'::date) d`,
           [start],
         )
@@ -69,7 +70,8 @@ describe('plan schedule and collaboration', () => {
       const [{ dates }] = (
         await db.query(
           `select array_agg(d::text order by d) as dates
-             from plan.rule_dates(row(null, null, 't', null, 'normal', null, 'monthly', 1, null, 31, '2026-01-31'::date, null, '2026-01-31'::date, 'active', 1, now(), null, now(), null)::plan.recurring_rules,
+             from plan.rule_dates(jsonb_populate_record(null::plan.recurring_rules,
+                                    jsonb_build_object('frequency', 'monthly', 'interval_count', 1, 'day_of_month', 31, 'starts_on', '2026-01-31')),
                                   '2026-01-01'::date, '2026-04-30'::date) d`,
         )
       ).rows;

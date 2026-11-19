@@ -9,7 +9,7 @@ import { createBusinessDependencies } from '@/modules/business';
 import { createLearningDependencies } from '@/modules/learning';
 import { createNotificationsDependencies } from '@/modules/notifications';
 import { createOperationsDependencies, type RelatedRecordsSource } from '@/modules/operations';
-import { createPlanDependencies } from '@/modules/plan';
+import { createPlanDependencies, type PlanLinkSource } from '@/modules/plan';
 import { createRecordsDependencies } from '@/modules/records';
 
 const FACT_PERIOD_DAYS = 30;
@@ -59,10 +59,10 @@ const RELATED_DAYS = 90;
 
 // Connects activities to the records and people they can point to: the only place operations
 // meets records. A link never copies an amount, so the labels name the record only.
-function createRelatedRecordsSource(records: RecordsDependencies, business: BusinessDependencies): RelatedRecordsSource {
+function createRelatedRecordsSource(records: RecordsDependencies, business: BusinessDependencies | null): RelatedRecordsSource {
   const from = () => daysBefore(todayIso(), RELATED_DAYS);
   return {
-    members: async (businessId) => (await business.memberships.listMembers(businessId)).map((m) => ({ id: m.userId, label: m.fullName || m.email })),
+    members: async (businessId) => (business ? (await business.memberships.listMembers(businessId)).map((m) => ({ id: m.userId, label: m.fullName || m.email })) : []),
     sales: async (businessId) =>
       (await records.sales.list(businessId, { from: from() }))
         .filter((sale) => sale.status === 'recorded')
@@ -76,6 +76,23 @@ function createRelatedRecordsSource(records: RecordsDependencies, business: Busi
   };
 }
 
+type OperationsDependencies = ReturnType<typeof createOperationsDependencies>;
+
+// Connects Plan to the records a task can be about (Plan section 4.3): the only place plan meets
+// records and operations. As for activities, a link names the record and never copies an amount.
+function createPlanLinkSource(records: RecordsDependencies, operations: OperationsDependencies): PlanLinkSource {
+  const related = createRelatedRecordsSource(records, null);
+  return {
+    sales: related.sales,
+    expenses: related.expenses,
+    products: related.products,
+    activities: async (businessId) =>
+      (await operations.activities.list(businessId, { from: daysBefore(todayIso(), RELATED_DAYS) }))
+        .filter((activity) => activity.status !== 'voided' && activity.status !== 'cancelled')
+        .map((activity) => ({ id: activity.id, label: `${activity.occurredOn} · ${activity.activityName}` })),
+  };
+}
+
 export function createAppDependencies(client: SupabaseClient) {
   const analytics = createAnalyticsDependencies(client);
   // Receipts, product photos and logos: one store, shared by the modules that attach files.
@@ -83,17 +100,18 @@ export function createAppDependencies(client: SupabaseClient) {
   const business = createBusinessDependencies(client, files);
   // Records reads receipts through the assistant's AI service; this is where the two meet.
   const records = createRecordsDependencies(client, { files, receipts: createReceiptReader(client) });
+  const operations = createOperationsDependencies(client, files, createRelatedRecordsSource(records, business));
   return {
     account: createAccountDependencies(client),
     business,
     records,
-    operations: createOperationsDependencies(client, files, createRelatedRecordsSource(records, business)),
+    operations,
     analytics,
     learning: createLearningDependencies(client),
     assistant: createAssistantDependencies(client, createBusinessFactsProvider(analytics.analytics)),
     notifications: createNotificationsDependencies(client),
     administration: createAdministrationDependencies(client),
-    plan: createPlanDependencies(client),
+    plan: createPlanDependencies(client, createPlanLinkSource(records, operations)),
   };
 }
 

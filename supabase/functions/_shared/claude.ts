@@ -6,6 +6,11 @@ const DEFAULT_MODEL = 'claude-opus-5-5';
 
 export class AiUnavailableError extends Error {}
 
+// The model that answers, recorded with stored suggestions (Plan section 4.6).
+export function aiModel(): string {
+  return Deno.env.get('ANTHROPIC_MODEL') ?? DEFAULT_MODEL;
+}
+
 export function isAiConfigured(): boolean {
   return Boolean(Deno.env.get('ANTHROPIC_API_KEY'));
 }
@@ -26,7 +31,7 @@ export async function askClaude<S extends z.ZodType>({ system, messages, schema,
   let response;
   try {
     response = await client.beta.messages.create({
-      model: Deno.env.get('ANTHROPIC_MODEL') ?? DEFAULT_MODEL,
+      model: aiModel(),
       max_tokens: 16000,
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',

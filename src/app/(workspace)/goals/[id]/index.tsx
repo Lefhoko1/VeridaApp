@@ -10,6 +10,7 @@ export default function GoalRoute() {
       onEdit={() => router.push({ pathname: '/goals/[id]/edit', params: { id } })}
       onOpenTask={(task) => router.push({ pathname: '/tasks/[id]', params: { id: task } })}
       onAddTask={() => router.push({ pathname: '/tasks/new', params: { goal: id } })}
+      onAssist={() => router.push({ pathname: '/assist', params: { goal: id } })}
     />
   );
 }

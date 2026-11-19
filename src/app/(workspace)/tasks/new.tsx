@@ -9,6 +9,7 @@ export default function NewTaskRoute() {
       goalId={goal}
       onDone={(id) => router.replace({ pathname: '/tasks/[id]', params: { id } })}
       onSeriesCreated={(id) => router.replace({ pathname: '/series/[id]', params: { id } })}
+      onQueued={() => router.back()}
     />
   );
 }

@@ -11,7 +11,9 @@ import { GOAL_STATUS_LABELS, PRIORITY_LABELS, TASK_STATUS_LABELS, isOpen, type T
 import {
   EVENT_STATUS_LABELS,
   EVENT_TYPE_LABELS,
+  WEEKDAY_SHORT,
   addDays,
+  isoWeekday,
   describeRule,
   groupByDay,
   monthGrid,
@@ -142,9 +144,11 @@ export function useScheduleViewModel() {
 // ---------------------------------------------------------------------------------------------
 // Events.
 
-const NEW_EVENT = { title: '', description: '', eventType: 'other', startsOn: '', startTime: '', endTime: '', status: 'scheduled' };
+const NEW_EVENT = { title: '', description: '', eventType: 'other', startsOn: '', startTime: '', endTime: '', status: 'scheduled', repeat: 'none', intervalCount: '1', daysOfWeek: '', dayOfMonth: '', endsOn: '' };
 
-export function useEventFormViewModel({ eventId, onDate, onDone }: { eventId?: string; onDate?: string; onDone: (id: string) => void }) {
+type EventFormArgs = { eventId?: string; onDate?: string; onDone: (id: string) => void; onSeriesCreated?: (ruleId: string) => void };
+
+export function useEventFormViewModel({ eventId, onDate, onDone, onSeriesCreated }: EventFormArgs) {
   const { plan, business, can, scope } = usePlanQueries();
   const feedback = useFeedback();
   const queryClient = useQueryClient();
@@ -156,6 +160,7 @@ export function useEventFormViewModel({ eventId, onDate, onDone }: { eventId?: s
     const event = existing.data;
     if (!event) return;
     reset({
+      ...NEW_EVENT,
       title: event.title,
       description: event.description ?? '',
       eventType: event.eventType,
@@ -166,12 +171,37 @@ export function useEventFormViewModel({ eventId, onDate, onDone }: { eventId?: s
     });
   }, [existing.data, reset]);
 
+  type Output = NonNullable<ReturnType<typeof form.validate>>;
   const save = useMutation({
-    mutationFn: (input: EventInput) => (eventId ? plan.updateEvent(eventId, input).then(() => eventId) : plan.createEvent(business.id, input)),
-    onSuccess: async (id) => {
+    mutationFn: async (value: Output): Promise<{ kind: 'event' | 'series'; id: string }> => {
+      const input: EventInput = { title: value.title, description: value.description, eventType: value.eventType, startsOn: value.startsOn, startTime: value.startTime, endTime: value.endTime, status: value.status };
+      if (!eventId && value.repeat !== 'none') {
+        const id = await plan.createEventRule(business.id, {
+          title: value.title,
+          description: value.description,
+          eventType: value.eventType,
+          startTime: value.startTime,
+          endTime: value.endTime,
+          frequency: value.repeat,
+          intervalCount: value.intervalCount,
+          daysOfWeek: value.daysOfWeek,
+          dayOfMonth: value.dayOfMonth,
+          startsOn: value.startsOn,
+          endsOn: value.endsOn,
+        });
+        return { kind: 'series', id };
+      }
+      return { kind: 'event', id: eventId ? await plan.updateEvent(eventId, input).then(() => eventId) : await plan.createEvent(business.id, input) };
+    },
+    onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: scope });
+      if (result.kind === 'series') {
+        feedback.success('Repeating event added to the schedule.');
+        if (onSeriesCreated) onSeriesCreated(result.id);
+        return;
+      }
       feedback.success(eventId ? 'Event updated.' : 'Event added to the schedule.');
-      onDone(id);
+      onDone(result.id);
     },
     onError: (error) => feedback.error(errorMessage(error)),
   });
@@ -185,6 +215,32 @@ export function useEventFormViewModel({ eventId, onDate, onDone }: { eventId?: s
     saving: save.isPending,
     typeOptions: options(EVENT_TYPE_LABELS),
     statusOptions: options(EVENT_STATUS_LABELS),
+    // Section 4.4: a new event can repeat, such as a weekly market day.
+    canRepeat: !eventId && Boolean(onSeriesCreated),
+    repeatOptions: [
+      { value: 'none', label: 'Does not repeat' },
+      { value: 'daily', label: 'Daily' },
+      { value: 'weekly', label: 'Weekly' },
+      { value: 'monthly', label: 'Monthly' },
+    ],
+    weekdayOptions: WEEKDAY_SHORT.map((label, index) => ({ value: String(index + 1), label })),
+    chosenWeekdays: form.values.daysOfWeek.split(',').filter(Boolean),
+    setWeekdays: (days: string[]) => form.setValue('daysOfWeek', days.sort().join(',')),
+    setRepeat(value: string) {
+      form.setValue('repeat', value);
+      const start = form.values.startsOn || todayIso();
+      if (value === 'weekly' && !form.values.daysOfWeek) form.setValue('daysOfWeek', String(isoWeekday(start)));
+      if (value === 'monthly' && !form.values.dayOfMonth) form.setValue('dayOfMonth', String(Number(start.slice(8, 10))));
+    },
+    repeatSummary:
+      form.values.repeat !== 'none'
+        ? describeRule({
+            frequency: form.values.repeat as 'daily' | 'weekly' | 'monthly',
+            intervalCount: Number(form.values.intervalCount) || 1,
+            daysOfWeek: form.values.daysOfWeek.split(',').filter(Boolean).map(Number),
+            dayOfMonth: Number(form.values.dayOfMonth) || 1,
+          })
+        : null,
     submit() {
       const input = form.validate();
       if (input) save.mutate(input);
@@ -201,7 +257,7 @@ export function useEventDetailViewModel(eventId: string) {
     mutationFn: (status: EventStatus) => {
       const current = event.data;
       if (!current) throw new Error('Event not loaded.');
-      const { id: _id, version: _version, ...rest } = current;
+      const { id: _id, version: _version, ruleId: _ruleId, ...rest } = current;
       return plan.updateEvent(eventId, { ...rest, status });
     },
     onSuccess: async (_result, status) => {
@@ -240,6 +296,7 @@ export function useSeriesDetailViewModel(ruleId: string) {
   const queryClient = useQueryClient();
   const rule = useQuery({ queryKey: [...scope, 'series', ruleId], queryFn: () => plan.getRule(ruleId) });
   const occurrences = useQuery({ queryKey: [...scope, 'series', ruleId, 'occurrences'], queryFn: () => plan.listOccurrences(ruleId) });
+  const eventOccurrences = useQuery({ queryKey: [...scope, 'series', ruleId, 'events'], queryFn: () => plan.listEventOccurrences(ruleId), enabled: rule.data?.kind === 'event' });
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const end = useMutation({
     mutationFn: () => plan.endRule(ruleId),
@@ -267,6 +324,13 @@ export function useSeriesDetailViewModel(ruleId: string) {
       .reverse()
       .map((task) => taskRow(task, today, members.nameOf)),
     past: list.filter((task) => !isOpen(task) || (task.dueOn ?? '') < today).map((task) => taskRow(task, today, members.nameOf)),
+    // An event series shows its events instead of tasks.
+    isEventSeries: current?.kind === 'event',
+    eventWhen: current ? timeRange(current.startTime, current.endTime) : '',
+    events: (eventOccurrences.data ?? [])
+      .slice()
+      .sort((a, b) => a.startsOn.localeCompare(b.startsOn))
+      .map((event) => ({ id: event.id, title: event.title, startsOn: event.startsOn, when: timeRange(event.startTime, event.endTime), statusLabel: EVENT_STATUS_LABELS[event.status], past: event.startsOn < today })),
     confirmingEnd,
     askToEnd: () => setConfirmingEnd(true),
     cancelEnd: () => setConfirmingEnd(false),
@@ -312,6 +376,7 @@ export function useSeriesFormViewModel({ ruleId, onDone }: { ruleId: string; onD
     loadError: rule.error ? errorMessage(rule.error) : null,
     form,
     summary: rule.data ? describeRule(rule.data) : '',
+    isEventSeries: rule.data?.kind === 'event',
     canSave: can('plan.tasks') && rule.data?.status === 'active',
     saving: save.isPending,
     priorityOptions: PRIORITY_OPTIONS,

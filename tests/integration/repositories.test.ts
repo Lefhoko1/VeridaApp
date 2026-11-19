@@ -670,4 +670,63 @@ describe('plan', () => {
     await plan.endRule(ruleId);
     expect((await plan.getRule(ruleId)).status).toBe('ended');
   });
+
+  it('suggests, accepts and dismisses, links records, relates measures and syncs offline captures (Plan module P2 and the rest)', async () => {
+    const { client } = await newUser('Completer');
+    const id = await newBusiness(client, { name: 'Complete Farm' });
+    const plan = new SupabasePlanRepository(client);
+    const inDays = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+    const task = { title: 'Pay the vet', description: null, priority: 'normal' as const, status: 'not_started' as const, dueOn: inDays(-3), completionNote: null, blockerReason: null, assignedTo: null, goalIds: [] };
+
+    // Section 8: the same captured task sent twice is one task.
+    const offline = { clientId: '5b0c4c4e-8f7a-4f42-9d55-7a2f3f1d9a10', recordedAt: new Date(Date.now() - 3_600_000).toISOString() };
+    const first = await plan.createTask(id, task, offline);
+    expect(await plan.createTask(id, task, offline)).toBe(first);
+    expect((await plan.listTasks(id)).filter((t) => t.title === 'Pay the vet')).toHaveLength(1);
+
+    // Section 4.6: the built-in rules suggest a new date for the overdue task; accepting moves it.
+    const suggestionId = await plan.suggestFromRules(id, 'weekly_plan', null, null);
+    expect(suggestionId).not.toBeNull();
+    const suggestion = await plan.getSuggestion(suggestionId!);
+    expect(suggestion).toMatchObject({ generator: 'rules', status: 'open', kind: 'weekly_plan' });
+    const reschedule = suggestion.actions.find((a) => a.type === 'update_task');
+    expect(reschedule?.payload).toMatchObject({ task_id: first, task_title: 'Pay the vet' });
+    await plan.acceptAction(reschedule!.id, { due_on: inDays(2) });
+    expect((await plan.getTask(first)).dueOn).toBe(inDays(2));
+    expect((await plan.listSuggestions(id)).length).toBeLessThanOrEqual(1);
+
+    const goalId = await plan.createGoal(id, { title: 'Open a shop', description: null, goalType: 'milestone', direction: null, unit: null, baselineValue: null, targetValue: null, tolerance: null, kpiCode: null, startOn: inDays(0), targetOn: null, status: 'active', statusReason: null });
+    const steps = await plan.suggestFromRules(id, 'goal_breakdown', goalId, null);
+    const stepSuggestion = await plan.getSuggestion(steps!);
+    const taskAction = stepSuggestion.actions.find((a) => a.type === 'create_task')!;
+    const made = await plan.acceptAction(taskAction.id, {});
+    expect(await plan.taskOrigin(made)).toMatchObject({ suggestionId: steps, generator: 'rules' });
+    expect((await plan.getTask(made)).goalIds).toEqual([goalId]);
+    await plan.dismissSuggestion(steps!);
+    expect((await plan.getSuggestion(steps!)).status).toBe('dismissed');
+
+    // Settings, links and measures.
+    expect(await plan.getSettings(id)).toEqual({ allowStaffAssignment: true, weeklySuggestions: false, defaultReminderTime: '08:00' });
+    await plan.saveSettings(id, { allowStaffAssignment: false, weeklySuggestions: true, defaultReminderTime: '07:00' });
+    expect(await plan.getSettings(id)).toEqual({ allowStaffAssignment: false, weeklySuggestions: true, defaultReminderTime: '07:00' });
+
+    await plan.addTaskLink(id, made, { type: 'kpi', recordId: null, kpiCode: 'revenue', label: 'Revenue' });
+    const [link] = await plan.listTaskLinks(made);
+    expect(link).toMatchObject({ type: 'kpi', kpiCode: 'revenue', label: 'Revenue' });
+    await plan.removeTaskLink(link!.id);
+    expect(await plan.listTaskLinks(made)).toEqual([]);
+
+    await plan.addGoalKpi(id, goalId, 'revenue');
+    expect(await plan.listGoalKpis(goalId)).toEqual(['revenue']);
+    expect((await plan.goalMeasures(goalId))[0]).toMatchObject({ code: 'revenue' });
+    await plan.removeGoalKpi(goalId, 'revenue');
+    expect(await plan.goalMeasures(goalId)).toEqual([]);
+
+    // Section 4.4: a repeating event.
+    const eventRule = await plan.createEventRule(id, { title: 'Market day', description: null, eventType: 'delivery', startTime: '08:00', endTime: '12:00', frequency: 'weekly', intervalCount: 1, daysOfWeek: [6], dayOfMonth: null, startsOn: inDays(0), endsOn: null });
+    expect(await plan.getRule(eventRule)).toMatchObject({ kind: 'event', eventType: 'delivery', startTime: '08:00' });
+    const events = await plan.listEventOccurrences(eventRule);
+    expect(events.length).toBeGreaterThanOrEqual(1);
+    expect(events[0]).toMatchObject({ ruleId: eventRule, startTime: '08:00', endTime: '12:00' });
+  });
 });

@@ -38,3 +38,18 @@ select cron.schedule(
   '10 0 * * *',
   $$ select plan.generate_all_occurrences() $$
 );
+
+-- Plan section 13: built-in suggestions every Monday at 05:00 UTC, for businesses whose owner
+-- turned them on in Plan settings. AI suggestions are always on request.
+select cron.schedule(
+  'verida-plan-weekly-suggestions',
+  '0 5 * * 1',
+  $$ select plan.weekly_rule_suggestions() $$
+);
+
+-- Plan section 10: remove suggestions nobody acted on after 90 days, nightly at 01:00 UTC.
+select cron.schedule(
+  'verida-plan-purge-suggestions',
+  '0 1 * * *',
+  $$ select plan.purge_old_recommendations() $$
+);

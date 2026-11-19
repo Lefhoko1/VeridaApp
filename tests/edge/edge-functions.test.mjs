@@ -36,6 +36,22 @@ function fakeUpstream() {
     if (fakeMode === 'refusal') return message([], 'refusal');
 
     const text = body.messages.at(-1).content;
+    if (String(body.system).includes('planning assistant')) {
+      const today = /<today>(.*?)<\/today>/.exec(text)[1];
+      const goalId = /<focus_goal>id (\S+):/.exec(text)?.[1] ?? null;
+      return message([{ type: 'text', text: JSON.stringify({
+        title: 'This week',
+        explanation: 'Focus on buyers.',
+        assumptions: 'You work weekdays.',
+        limitations: null,
+        sources: [],
+        actions: [{
+          type: 'create_task', why: 'To move the goal', title: 'Call two buyers', description: null, priority: 'high',
+          due_on: fakeMode === 'bad-plan' ? '2001-01-01' : today, goal_ids: goalId ? [goalId] : [], task_id: null, goal_id: null,
+          event_type: null, starts_on: null, start_time: null, end_time: null, target_on: null,
+        }],
+      }) }]);
+    }
     if (String(body.system).includes('Ask Verida')) {
       return message([{ type: 'text', text: JSON.stringify({
         text: 'Your revenue is BWP 84.',
@@ -82,7 +98,7 @@ async function startFunction(name, port, env) {
 }
 
 describe('edge functions under Deno', () => {
-  let emulator, upstream, baseEnv, ask, lesson, dispatch, askUnconfigured;
+  let emulator, upstream, baseEnv, ask, lesson, dispatch, askUnconfigured, planAssist;
 
   const auth = (path, body) => fetch(`${emulator.url}/auth/v1/${path}`, { method: 'POST', body: JSON.stringify(body) }).then((r) => r.json());
 
@@ -126,11 +142,12 @@ describe('edge functions under Deno', () => {
       SUPABASE_SECRET_KEYS: '',
     };
     const ai = { ...baseEnv, ANTHROPIC_API_KEY: 'test-key', ANTHROPIC_BASE_URL: upstream.url };
-    [ask, lesson, dispatch, askUnconfigured] = await Promise.all([
+    [ask, lesson, dispatch, askUnconfigured, planAssist] = await Promise.all([
       startFunction('ask-verida', 18101, ai),
       startFunction('generate-lesson', 18102, ai),
       startFunction('dispatch-email', 18103, { ...baseEnv, RESEND_API_KEY: 'test-key', RESEND_API_URL: `${upstream.url}/emails` }),
       startFunction('ask-verida', 18104, { ...baseEnv, ANTHROPIC_API_KEY: '' }),
+      startFunction('plan-assist', 18105, ai),
     ]);
   }, { timeout: 180000 });
 
@@ -315,5 +332,35 @@ describe('edge functions under Deno', () => {
     assert.ok(sent);
     assert.ok(!sent.body.html.includes('<script>'));
     assert.ok(sent.body.html.includes('&lt;script&gt;'));
+  });
+
+  test('drafts plan suggestions that wait for the owner, and refuses an unsafe draft (Plan section 4.6)', async () => {
+    fakeMode = 'ok';
+    const user = await newUser('planner');
+    const businessId = await newBusiness(user, 'Plan Edge Farm');
+    const goal = await rest(user.token, 'plan', 'goals', { business_id: businessId, title: 'Open a farm shop', goal_type: 'milestone' });
+    const goalId = goal.data[0].id;
+
+    const response = await call(planAssist, user.token, { businessId, kind: 'goal_breakdown', goalId });
+    assert.equal(response.status, 200);
+    const rec = await rest(user.token, 'plan', `recommendations?id=eq.${response.data.recommendationId}&select=generator,model,goal_id,status`);
+    assert.deepEqual(rec.data[0], { generator: 'ai', model: 'claude-opus-5-5', goal_id: goalId, status: 'open' });
+    const actions = await rest(user.token, 'plan', `recommendation_actions?recommendation_id=eq.${response.data.recommendationId}&select=approval_status,proposed_payload`);
+    assert.equal(actions.data[0].approval_status, 'proposed');
+    assert.deepEqual(actions.data[0].proposed_payload.goal_ids, [goalId]);
+    const tasks = await rest(user.token, 'plan', `tasks?business_id=eq.${businessId}&select=id`);
+    assert.deepEqual(tasks.data, [], 'nothing is created until the owner accepts');
+
+    const sent = fakeRequests.findLast((r) => r.url.startsWith('/v1/messages'));
+    assert.equal(sent.body.output_config.effort, 'medium');
+    assert.match(sent.body.messages.at(-1).content, /Open a farm shop/);
+
+    fakeMode = 'bad-plan';
+    const refused = await call(planAssist, user.token, { businessId, kind: 'weekly_plan' });
+    assert.equal(refused.status, 503);
+    fakeMode = 'ok';
+
+    const stranger = await newUser('plan-stranger');
+    assert.equal((await call(planAssist, stranger.token, { businessId, kind: 'weekly_plan' })).status, 403);
   });
 });

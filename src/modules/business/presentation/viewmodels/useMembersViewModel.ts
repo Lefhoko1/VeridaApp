@@ -207,6 +207,8 @@ export function useMemberOptions() {
   const list = members.data ?? [];
   return {
     options: list.map((member) => ({ value: member.userId, label: member.fullName || member.email })),
+    // For a business that gives tasks only to its owners.
+    ownerOptions: list.filter((member) => member.role === 'owner').map((member) => ({ value: member.userId, label: member.fullName || member.email })),
     nameOf: (userId: string | null) => (userId ? (list.find((member) => member.userId === userId)?.fullName ?? null) : null),
   };
 }

@@ -25,9 +25,11 @@ import {
   type TaskInput,
   type TaskStatus,
 } from '../../domain/models';
+import { LINK_TYPE_LABELS, type LinkType } from '../../domain/assist';
 import { EVENT_TYPE_LABELS, WEEKDAY_SHORT, addDays, describeChanges, describeRule, isoWeekday, reminderState, timeRange, type RuleInput } from '../../domain/schedule';
 import { commentFormSchema, goalFormSchema, milestoneFormSchema, progressFormSchema, reminderFormSchema, ruleFields, taskFormSchema } from '../../domain/validation';
 import { usePlanDependencies } from '../di';
+import { isOffline, usePlanSync } from './usePlanSync';
 
 const daysFrom = addDays;
 
@@ -44,7 +46,8 @@ export function usePlanQueries() {
   const enabled = can('plan.view');
   const tasks = useQuery({ queryKey: [...scope, 'tasks'], queryFn: () => plan.listTasks(business.id), enabled });
   const goals = useQuery({ queryKey: [...scope, 'goals'], queryFn: () => plan.listGoals(business.id), enabled });
-  return { plan, business, userId, can, scope, tasks, goals, enabled };
+  const settings = useQuery({ queryKey: [...scope, 'settings'], queryFn: () => plan.getSettings(business.id), enabled, staleTime: 60_000 });
+  return { plan, business, userId, can, scope, tasks, goals, settings, enabled };
 }
 
 // Each goal's progress comes from the backend (section 7.1). Plan never calculates it here.
@@ -122,9 +125,20 @@ export function usePlanSectionsViewModel(initial: PlanSection = 'overview') {
 }
 
 // Section 4.1: today's focus, counts, active goals and upcoming work.
+export type UpcomingWindow = 'today' | 'tomorrow' | 'week';
+export const UPCOMING_WINDOWS = [
+  { value: 'today', label: 'Today' },
+  { value: 'tomorrow', label: 'Tomorrow' },
+  { value: 'week', label: 'This week' },
+];
+
 export function usePlanOverviewViewModel() {
-  const { plan, business, can, scope, tasks, goals, enabled } = usePlanQueries();
+  const { plan, business, userId, can, scope, tasks, goals, enabled } = usePlanQueries();
   const members = useMemberOptions();
+  const sync = usePlanSync();
+  const [span, setSpan] = useState<UpcomingWindow>('week');
+  // Section 4.1: filtering by assignee, here as "only mine".
+  const [mineOnly, setMineOnly] = useState(false);
   const today = todayIso();
   const overview = useQuery({
     queryKey: [...scope, 'overview', 'week'],
@@ -141,10 +155,20 @@ export function usePlanOverviewViewModel() {
   });
   const activeGoals = (goals.data ?? []).filter((goal) => goal.status === 'active' || goal.status === 'at_risk');
   const withProgress = useGoalsWithProgress(activeGoals, scope);
-  const open = (tasks.data ?? []).filter(isOpen);
+  const open = (tasks.data ?? []).filter(isOpen).filter((task) => !mineOnly || task.assignedTo === userId);
+  const tomorrow = daysFrom(businessToday, 1);
+  const inWindow = (day: string | null) =>
+    day !== null && (span === 'today' ? day === businessToday : span === 'tomorrow' ? day === tomorrow : day > businessToday && day <= weekAhead);
 
   return {
     canView: enabled,
+    sync,
+    canManageSettings: can('business.manage'),
+    mineOnly,
+    toggleMine: () => setMineOnly((value) => !value),
+    span,
+    spans: UPCOMING_WINDOWS,
+    setSpan: (value: string) => setSpan(value as UpcomingWindow),
     loading: enabled && (overview.isPending || tasks.isPending || goals.isPending),
     error: overview.error ? errorMessage(overview.error) : tasks.error ? errorMessage(tasks.error) : null,
     retry() {
@@ -160,11 +184,11 @@ export function usePlanOverviewViewModel() {
       .slice(0, 6)
       .map((task) => taskRow(task, businessToday, members.nameOf)),
     upcoming: focusOrder(open, businessToday)
-      .filter((task) => task.dueOn !== null && task.dueOn > businessToday && task.dueOn <= weekAhead)
-      .slice(0, 6)
+      .filter((task) => inWindow(task.dueOn))
+      .slice(0, 8)
       .map((task) => taskRow(task, businessToday, members.nameOf)),
     events: (coming.data ?? [])
-      .filter((item) => item.kind === 'event' && item.status === 'scheduled' && item.id !== null)
+      .filter((item) => item.kind === 'event' && item.status === 'scheduled' && item.id !== null && (span === 'week' || inWindow(item.onDate)))
       .slice(0, 5)
       .map((item) => ({
         id: item.id ?? '',
@@ -186,14 +210,21 @@ export function useTaskListViewModel() {
   const [priority, setPriority] = useState('');
   const [assignee, setAssignee] = useState('');
   const [search, setSearch] = useState('');
+  const [dueFrom, setDueFrom] = useState('');
+  const [dueTo, setDueTo] = useState('');
+  const sync = usePlanSync();
   const today = todayIso();
   const term = search.trim().toLowerCase();
+  const isDay = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
 
   const items = (tasks.data ?? [])
     .filter((task) => (filter === 'all' ? true : filter === 'open' ? isOpen(task) : task.status === filter))
     .filter((task) => !priority || task.priority === priority)
     .filter((task) => !assignee || task.assignedTo === assignee)
-    .filter((task) => !term || task.title.toLowerCase().includes(term) || (task.description ?? '').toLowerCase().includes(term));
+    .filter((task) => !term || task.title.toLowerCase().includes(term) || (task.description ?? '').toLowerCase().includes(term))
+    // Section 4.1: a date range, on the due date.
+    .filter((task) => !isDay(dueFrom) || (task.dueOn !== null && task.dueOn >= dueFrom))
+    .filter((task) => !isDay(dueTo) || (task.dueOn !== null && task.dueOn <= dueTo));
 
   return {
     loading: enabled && tasks.isPending,
@@ -208,6 +239,11 @@ export function useTaskListViewModel() {
     setAssignee,
     search,
     setSearch,
+    dueFrom,
+    setDueFrom,
+    dueTo,
+    setDueTo,
+    sync,
     priorityOptions: [{ value: '', label: 'Any priority' }, ...PRIORITY_OPTIONS],
     assigneeOptions: [{ value: '', label: 'Anyone' }, ...members.options],
     items: (filter === 'open' ? focusOrder(items, today) : items).map((task) => taskRow(task, today, members.nameOf)),
@@ -253,10 +289,26 @@ export const WEEKDAY_OPTIONS = WEEKDAY_SHORT.map((label, index) => ({ value: Str
 
 export type EditScope = 'one' | 'series';
 
-type TaskFormArgs = { taskId?: string; goalId?: string; onDone: (id: string) => void; onSeriesCreated?: (ruleId: string) => void };
+type TaskFormArgs = {
+  taskId?: string;
+  goalId?: string;
+  onDone: (id: string) => void;
+  onSeriesCreated?: (ruleId: string) => void;
+  // Section 8: the task was kept on this device because there is no connection.
+  onQueued?: () => void;
+};
 
-export function useTaskFormViewModel({ taskId, goalId, onDone, onSeriesCreated }: TaskFormArgs) {
-  const { plan, business, can, scope, goals } = usePlanQueries();
+export const TASK_REMINDER_OPTIONS = [
+  { value: '', label: 'No reminder' },
+  { value: 'due', label: 'On the due day' },
+  { value: 'before', label: 'The evening before (18:00)' },
+];
+
+export function useTaskFormViewModel({ taskId, goalId, onDone, onSeriesCreated, onQueued }: TaskFormArgs) {
+  const { plan, business, can, scope, goals, settings } = usePlanQueries();
+  const sync = usePlanSync();
+  // Journey 5.1 step 5: a reminder can be asked for while creating the task.
+  const [reminder, setReminder] = useState('');
   const members = useMemberOptions();
   const feedback = useFeedback();
   const queryClient = useQueryClient();
@@ -314,7 +366,16 @@ export function useTaskFormViewModel({ taskId, goalId, onDone, onSeriesCreated }
         };
         return { kind: 'series', id: await plan.createRule(business.id, input) };
       }
-      if (!taskId) return { kind: 'task', id: await plan.createTask(business.id, toInput(value)) };
+      if (!taskId) {
+        const id = await plan.createTask(business.id, toInput(value));
+        const at = reminder === 'due' ? (settings.data?.defaultReminderTime ?? '08:00') : '18:00';
+        const on = reminder === 'due' ? value.dueOn : value.dueOn ? daysFrom(value.dueOn, -1) : null;
+        if (reminder && on) {
+          // A reminder that cannot be set, such as one already in the past, does not lose the task.
+          await plan.setReminder(id, on, at).catch(() => undefined);
+        }
+        return { kind: 'task', id };
+      }
 
       const loaded = existing.data;
       if (!loaded) throw new Error('Task not loaded.');
@@ -341,7 +402,18 @@ export function useTaskFormViewModel({ taskId, goalId, onDone, onSeriesCreated }
       feedback.success(taskId ? (editScope === 'series' ? 'This and later tasks updated.' : 'Task updated.') : 'Task added.');
       onDone(result.id);
     },
-    onError: (error) => feedback.error(errorMessage(error)),
+    onError: async (error, value) => {
+      // Section 8: without a connection, a one-off task waits on this device and syncs later.
+      if (isOffline(error) && value.repeat === 'none') {
+        const loaded = existing.data;
+        if (taskId && loaded) await sync.enqueueUpdate(loaded, toInput(value));
+        else if (!taskId) await sync.enqueueCreate(toInput(value));
+        feedback.success('No connection. Saved on this device; it will sync when you are back online.');
+        if (onQueued) onQueued();
+        return;
+      }
+      feedback.error(errorMessage(error));
+    },
   });
 
   const chosenGoals = form.values.goalIds.split(',').filter(Boolean);
@@ -357,7 +429,13 @@ export function useTaskFormViewModel({ taskId, goalId, onDone, onSeriesCreated }
     saving: save.isPending,
     priorityOptions: PRIORITY_OPTIONS,
     statusOptions: TASK_STATUS_OPTIONS,
-    assigneeOptions: [{ value: '', label: 'Nobody yet' }, ...members.options],
+    // Section 13: a business can give tasks only to its owners.
+    assigneeOptions: [{ value: '', label: 'Nobody yet' }, ...(settings.data?.allowStaffAssignment === false ? members.ownerOptions : members.options)],
+    assigneeHint: settings.data?.allowStaffAssignment === false ? 'Only owners can be given tasks in this business.' : undefined,
+    reminder,
+    setReminder,
+    reminderOptions: TASK_REMINDER_OPTIONS,
+    canRemind: !taskId,
     goalOptions: openGoals.map((goal) => ({ value: goal.id, label: goal.title })),
     chosenGoals,
     setGoals: (ids: string[]) => form.setValue('goalIds', ids.join(',')),
@@ -416,6 +494,33 @@ const SNOOZE_CHOICES = [
 
 export function useTaskDetailViewModel(taskId: string) {
   const { plan, business, userId, can, scope, goals } = usePlanQueries();
+  const { links: linkSource } = usePlanDependencies();
+  const sync = usePlanSync();
+  const origin = useQuery({ queryKey: [...scope, 'tasks', taskId, 'origin'], queryFn: () => plan.taskOrigin(taskId) });
+  const taskLinks = useQuery({ queryKey: [...scope, 'tasks', taskId, 'links'], queryFn: () => plan.listTaskLinks(taskId) });
+  const kpiChoices = useQuery({ queryKey: [...scope, 'kpi-options'], queryFn: () => plan.kpiOptions(business.id), staleTime: Infinity });
+  const [linkType, setLinkType] = useState<LinkType | ''>('');
+  const [linkChoice, setLinkChoice] = useState('');
+  const linkOptions = useQuery({
+    queryKey: [...scope, 'link-options', linkType],
+    queryFn: async () => {
+      switch (linkType) {
+        case 'sale':
+          return linkSource.sales(business.id);
+        case 'expense':
+          return linkSource.expenses(business.id);
+        case 'product':
+          return linkSource.products(business.id);
+        case 'activity':
+          return linkSource.activities(business.id);
+        case 'kpi':
+          return (kpiChoices.data ?? []).map((kpi) => ({ id: kpi.code, label: kpi.name }));
+        default:
+          return [];
+      }
+    },
+    enabled: Boolean(linkType) && (linkType !== 'kpi' || kpiChoices.isSuccess),
+  });
   const members = useMemberOptions();
   const feedback = useFeedback();
   const queryClient = useQueryClient();
@@ -464,12 +569,42 @@ export function useTaskDetailViewModel(taskId: string) {
       await refresh();
       feedback.success(`Marked as ${TASK_STATUS_LABELS[status].toLowerCase()}.`);
     },
-    onError: async (error) => {
+    onError: async (error, { status, reason }) => {
+      const current = task.data;
+      // Section 8: offline, the change waits on this device; a completion is never lost.
+      if (isOffline(error) && current) {
+        await sync.enqueueUpdate(current, {
+          title: current.title,
+          description: current.description,
+          priority: current.priority,
+          status,
+          dueOn: current.dueOn,
+          completionNote: current.completionNote,
+          blockerReason: reason ?? current.blockerReason,
+          assignedTo: current.assignedTo,
+          goalIds: current.goalIds,
+        });
+        setAskingReason(false);
+        feedback.success('No connection. The change is saved on this device and will sync when you are back online.');
+        return;
+      }
       feedback.error(errorMessage(error));
       // A conflict means the screen is out of date, so show the latest.
       await refresh();
     },
   });
+
+  const addLink = useMutation({
+    mutationFn: (target: { type: LinkType; id: string; label: string }) =>
+      plan.addTaskLink(business.id, taskId, { type: target.type, recordId: target.type === 'kpi' ? null : target.id, kpiCode: target.type === 'kpi' ? target.id : null, label: target.label }),
+    onSuccess: async () => {
+      setLinkType('');
+      setLinkChoice('');
+      await refresh();
+    },
+    ...report,
+  });
+  const removeLink = useMutation({ mutationFn: (id: string) => plan.removeTaskLink(id), onSuccess: refresh, ...report });
 
   const addComment = useMutation({
     mutationFn: (body: string) => plan.addComment(business.id, taskId, body),
@@ -596,6 +731,35 @@ export function useTaskDetailViewModel(taskId: string) {
     snooze: (id: string, minutes: number) => snooze.mutate({ id, minutes }),
     dismissReminder: (id: string) => dismiss.mutate(id),
 
+    // Section 4.6: a task added from a suggestion keeps a link back to it.
+    origin: origin.data ? { suggestionId: origin.data.suggestionId, label: `Added from a ${origin.data.generator === 'ai' ? 'Verida AI' : 'Verida'} suggestion on ${formatDay(origin.data.generatedAt.slice(0, 10))}` } : null,
+    // A change to this task still waiting on this device.
+    pendingSync: sync.pending.some((item) => item.clientId === `update-${taskId}`),
+
+    // Section 4.3: records this task is about.
+    links: (taskLinks.data ?? []).map((link) => ({ ...link, typeLabel: LINK_TYPE_LABELS[link.type] })),
+    canLink: canEdit,
+    linkType,
+    linkTypeOptions: [{ value: '', label: 'Choose what to link' }, ...(Object.keys(LINK_TYPE_LABELS) as LinkType[]).map((value) => ({ value, label: LINK_TYPE_LABELS[value] }))],
+    setLinkType(value: string) {
+      setLinkType(value as LinkType | '');
+      setLinkChoice('');
+    },
+    linkChoice,
+    setLinkChoice,
+    linkChoiceOptions: (linkOptions.data ?? []).map((option) => ({ value: option.id, label: option.label })),
+    linkOptionsLoading: Boolean(linkType) && linkOptions.isPending,
+    addingLink: addLink.isPending,
+    addLink() {
+      const chosen = (linkOptions.data ?? []).find((option) => option.id === linkChoice);
+      if (!linkType || !chosen) {
+        feedback.error('Choose a record to link.');
+        return;
+      }
+      addLink.mutate({ type: linkType, id: chosen.id, label: chosen.label.slice(0, 160) });
+    },
+    removeLink: (id: string) => removeLink.mutate(id),
+
     // History (section 4.3), loaded only when asked for.
     showHistory,
     toggleHistory: () => setShowHistory((value) => !value),
@@ -697,6 +861,8 @@ export function useGoalDetailViewModel(goalId: string) {
   const progress = useQuery({ queryKey: [...scope, 'goals', goalId, 'progress'], queryFn: () => plan.goalProgress(goalId) });
   const milestones = useQuery({ queryKey: [...scope, 'goals', goalId, 'milestones'], queryFn: () => plan.listMilestones(goalId) });
   const observations = useQuery({ queryKey: [...scope, 'goals', goalId, 'observations'], queryFn: () => plan.listProgress(goalId) });
+  const measures = useQuery({ queryKey: [...scope, 'goals', goalId, 'measures'], queryFn: () => plan.goalMeasures(goalId) });
+  const [measureChoice, setMeasureChoice] = useState('');
   const members = useMemberOptions();
   const kpis = useQuery({ queryKey: [...scope, 'kpi-options'], queryFn: () => plan.kpiOptions(business.id), staleTime: Infinity });
   const progressForm = useForm(progressFormSchema, { recordedOn: todayIso(), actualValue: '', note: '' });
@@ -730,6 +896,15 @@ export function useGoalDetailViewModel(goalId: string) {
     ...report,
   });
   const removeMilestone = useMutation({ mutationFn: (id: string) => plan.removeMilestone(id), onSuccess: refresh, ...report });
+  const addMeasure = useMutation({
+    mutationFn: (code: string) => plan.addGoalKpi(business.id, goalId, code),
+    onSuccess: async () => {
+      setMeasureChoice('');
+      await refresh();
+    },
+    ...report,
+  });
+  const removeMeasure = useMutation({ mutationFn: (code: string) => plan.removeGoalKpi(goalId, code), onSuccess: refresh, ...report });
   const changeStatus = useMutation({
     mutationFn: ({ status, reason }: { status: GoalStatus; reason: string | null }) => {
       const current = goal.data;
@@ -793,11 +968,23 @@ export function useGoalDetailViewModel(goalId: string) {
     },
     toggleMilestone: (id: string, done: boolean) => toggleMilestone.mutate({ id, done }),
     removeMilestone: (id: string) => removeMilestone.mutate(id),
-    statusChoices: (['active', 'on_hold', 'at_risk', 'completed', 'cancelled'] as const).filter((status) => status !== current?.status),
+    // Section 4.2: measures related to the goal, with their period and status, never as proof it moved.
+    measures: (measures.data ?? []).map((measure) => ({
+      ...measure,
+      display: measure.value === null ? 'Not available yet' : `${measure.value}${measure.unitKind === 'percent' ? '%' : ''}`,
+      period: `${formatDay(measure.periodFrom)} to ${formatDay(measure.periodTo)}`,
+      estimated: measure.status === 'estimated',
+    })),
+    measureOptions: (kpis.data ?? []).filter((kpi) => !(measures.data ?? []).some((m) => m.code === kpi.code)).map((kpi) => ({ value: kpi.code, label: kpi.name })),
+    measureChoice,
+    setMeasureChoice,
+    addMeasure: () => measureChoice && addMeasure.mutate(measureChoice),
+    removeMeasure: (code: string) => removeMeasure.mutate(code),
+    statusChoices: (['active', 'on_hold', 'at_risk', 'completed', 'expired', 'cancelled'] as const).filter((status) => status !== current?.status),
     statusName: (status: GoalStatus) => GOAL_STATUS_LABELS[status],
     pendingStatus,
     chooseStatus(status: GoalStatus) {
-      if (status === 'cancelled' || status === 'at_risk' || status === 'on_hold') setPendingStatus(status);
+      if (status === 'cancelled' || status === 'at_risk' || status === 'on_hold' || status === 'expired') setPendingStatus(status);
       else changeStatus.mutate({ status, reason: null });
     },
     cancelStatus: () => setPendingStatus(null),
