@@ -203,6 +203,22 @@ describe('lesson generation', () => {
   });
 });
 
+describe('Ask Verida tasks (Plan journey 5.1)', () => {
+  it('turns a task the person described into the task form’s title and due date', () => {
+    const answer = toClientAnswer({
+      ...baseAnswer,
+      intent: 'capture:task',
+      capture: { target: 'task', item_or_description: 'Order feed', category: null, activity_name: null, quantity: '20', unit: null, unit_price: null, amount: null, occurred_on: '2026-11-27', missing_fields: [] },
+    });
+    expect(answer.suggestedCapture).toBe('task');
+    expect(answer.capturePrefill).toEqual({ title: 'Order feed', dueOn: '2026-11-27' });
+  });
+
+  it('tells the model how to suggest a task', () => {
+    expect(ASSISTANT_SYSTEM_PROMPT).toContain('target "task"');
+  });
+});
+
 describe('Plan assistant (Plan section 4.6)', () => {
   const context: PlanContext = {
     today: '2026-11-20',
@@ -252,6 +268,16 @@ describe('Plan assistant (Plan section 4.6)', () => {
     expect(text).toContain('<focus_goal>id g1: Sell 450 trays</focus_goal>');
     expect(text).toContain('I am free mornings only');
     expect(text).not.toMatch(/assigned|member/i);
+  });
+
+  it('puts the insight a person asked about in front of the model (journey 5.3)', () => {
+    const text = plan.buildPlanRequest(context, 'insight_actions', {
+      request: null,
+      focusGoalId: null,
+      focusInsight: { kpiCode: 'revenue', title: 'Revenue is down 20%', body: 'It moved from BWP 1,000 to BWP 800.', evidence: 'Revenue, 1 to 31 Oct' },
+    });
+    expect(text).toContain('<focus_insight>\nRevenue is down 20%\nIt moved from BWP 1,000 to BWP 800.\nBased on: Revenue, 1 to 31 Oct\nMeasure: revenue\n</focus_insight>');
+    expect(text).toContain('the insight in <focus_insight>');
   });
 
   it('accepts a sound plan and turns it into the fields the database expects', () => {

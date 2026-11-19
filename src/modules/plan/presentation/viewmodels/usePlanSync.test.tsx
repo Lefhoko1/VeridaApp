@@ -1,25 +1,25 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook, waitFor } from "@testing-library/react-native";
-import type { ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, renderHook, waitFor } from '@testing-library/react-native';
+import type { ReactNode } from 'react';
 
-import { AppError } from "@/core/errors/AppError";
+import { AppError } from '@/core/errors/AppError';
 
-import type { OutboxItem, PlanOutbox, Suggestion } from "../../domain/assist";
-import type { Task, TaskInput } from "../../domain/models";
-import type { PlanRepository } from "../../domain/repositories";
-import { PlanDependenciesProvider } from "../di";
-import { useSuggestionViewModel } from "./useAssistViewModels";
-import { usePlanSync } from "./usePlanSync";
+import type { OutboxItem, PlanOutbox, Suggestion } from '../../domain/assist';
+import type { Task, TaskInput } from '../../domain/models';
+import type { PlanRepository } from '../../domain/repositories';
+import { PlanDependenciesProvider } from '../di';
+import { useSuggestionViewModel } from './useAssistViewModels';
+import { usePlanSync } from './usePlanSync';
 
 const mockFeedback = { success: jest.fn(), error: jest.fn() };
-jest.mock("@/design-system", () => ({ useFeedback: () => mockFeedback }));
-jest.mock("@/core/app/useOnForeground", () => ({
+jest.mock('@/design-system', () => ({ useFeedback: () => mockFeedback }));
+jest.mock('@/core/app/useOnForeground', () => ({
   useOnForeground: () => undefined,
 }));
-jest.mock("@/modules/business", () => ({
+jest.mock('@/modules/business', () => ({
   useActiveBusiness: () => ({
-    business: { id: "biz-1" },
-    userId: "me",
+    business: { id: 'biz-1' },
+    userId: 'me',
     can: () => true,
   }),
   useMemberOptions: () => ({
@@ -30,10 +30,10 @@ jest.mock("@/modules/business", () => ({
 }));
 
 const INPUT: TaskInput = {
-  title: "Fix fence",
+  title: 'Fix fence',
   description: null,
-  priority: "normal",
-  status: "not_started",
+  priority: 'normal',
+  status: 'not_started',
   dueOn: null,
   completionNote: null,
   blockerReason: null,
@@ -42,15 +42,16 @@ const INPUT: TaskInput = {
 };
 const TASK: Task = {
   ...INPUT,
-  id: "task-1",
+  id: 'task-1',
   completedAt: null,
   version: 2,
-  createdAt: "2026-11-19T00:00:00Z",
+  createdAt: '2026-11-19T00:00:00Z',
   completedOn: null,
   ruleId: null,
   occurrenceOn: null,
+  attachmentPaths: [],
 };
-const offline = () => new AppError("network", "We could not reach Verida.");
+const offline = () => new AppError('network', 'We could not reach Verida.');
 
 function memoryOutbox(): PlanOutbox & { items: () => OutboxItem[] } {
   let items: OutboxItem[] = [];
@@ -58,10 +59,7 @@ function memoryOutbox(): PlanOutbox & { items: () => OutboxItem[] } {
     items: () => items,
     list: async () => items,
     put: async (_scope, item) => {
-      items = [
-        ...items.filter((existing) => existing.clientId !== item.clientId),
-        item,
-      ];
+      items = [...items.filter((existing) => existing.clientId !== item.clientId), item];
     },
     remove: async (_scope, clientId) => {
       items = items.filter((existing) => existing.clientId !== clientId);
@@ -77,23 +75,17 @@ function fakePlan(overrides: Partial<PlanRepository>): PlanRepository {
       getSettings: async () => ({
         allowStaffAssignment: true,
         weeklySuggestions: false,
-        defaultReminderTime: "08:00",
+        defaultReminderTime: '08:00',
       }),
       ...overrides,
     } as Partial<PlanRepository>,
     {
-      get: (target, key: string) =>
-        (target as Record<string, unknown>)[key] ??
-        jest.fn(async () => undefined),
+      get: (target, key: string) => (target as Record<string, unknown>)[key] ?? jest.fn(async () => undefined),
     },
   ) as PlanRepository;
 }
 
-function wrapperFor(
-  plan: PlanRepository,
-  outbox: PlanOutbox,
-  advisor = { suggest: jest.fn() },
-) {
+function wrapperFor(plan: PlanRepository, outbox: PlanOutbox, advisor = { suggest: jest.fn() }) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false, gcTime: Infinity },
@@ -108,6 +100,7 @@ function wrapperFor(
             plan,
             outbox,
             advisor,
+            files: noFiles,
             links: {
               sales: async () => [],
               expenses: async () => [],
@@ -123,15 +116,15 @@ function wrapperFor(
   };
 }
 
+// No file storage is used by these tests.
+const noFiles = { upload: jest.fn(), linkFor: jest.fn(), linksFor: jest.fn(async () => ({})), remove: jest.fn() };
+
 beforeEach(() => jest.clearAllMocks());
 
-describe("usePlanSync (Plan section 8)", () => {
-  it("keeps a task captured offline and sends it once, with its client id, when the connection returns", async () => {
+describe('usePlanSync (Plan section 8)', () => {
+  it('keeps a task captured offline and sends it once, with its client id, when the connection returns', async () => {
     const outbox = memoryOutbox();
-    const createTask = jest
-      .fn()
-      .mockRejectedValueOnce(offline())
-      .mockResolvedValue("task-9");
+    const createTask = jest.fn().mockRejectedValueOnce(offline()).mockResolvedValue('task-9');
     const { result } = await renderHook(() => usePlanSync(), {
       wrapper: wrapperFor(fakePlan({ createTask }), outbox),
     });
@@ -140,87 +133,98 @@ describe("usePlanSync (Plan section 8)", () => {
     await waitFor(() => expect(result.current.pending).toHaveLength(1));
     expect(result.current.offline).toBe(true);
 
-    await act(async () => result.current.syncNow());
-    await waitFor(() => expect(createTask).toHaveBeenCalledTimes(1));
-    expect(outbox.items()).toHaveLength(1);
-
-    await act(async () => result.current.syncNow());
-    await waitFor(() => expect(outbox.items()).toHaveLength(0));
+    // The first attempt finds no connection and keeps the task; a later one sends it. Syncing is
+    // asked for until each happens, so the test does not depend on when the timer fires.
+    await waitFor(() => {
+      result.current.syncNow();
+      expect(createTask).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      result.current.syncNow();
+      expect(outbox.items()).toHaveLength(0);
+    });
+    expect(createTask).toHaveBeenCalledTimes(2);
     // Both attempts carry the same client id, so the database makes one task however often it is sent.
-    const [first, second] = createTask.mock.calls.map(
-      (call) =>
-        (
-          call as [string, TaskInput, { clientId: string; recordedAt: string }]
-        )[2],
-    );
+    const [first, second] = createTask.mock.calls.map((call) => (call as [string, TaskInput, { clientId: string; recordedAt: string }])[2]);
     expect(second?.clientId).toBe(first?.clientId);
     expect(second?.recordedAt).toBe(first?.recordedAt);
     expect(result.current.offline).toBe(false);
   });
 
-  it("never applies a change over someone else’s newer one, and lets the person keep theirs without losing the other edits", async () => {
+  it('never applies a change over someone else’s newer one, and lets the person keep theirs without losing the other edits', async () => {
     const outbox = memoryOutbox();
-    const latest: Task = { ...TASK, title: "Fix the north fence", version: 5 };
-    const updateTask = jest
-      .fn()
-      .mockRejectedValueOnce(
-        new AppError("conflict", "Someone changed this task."),
-      )
-      .mockResolvedValue(undefined);
+    const latest: Task = { ...TASK, title: 'Fix the north fence', version: 5 };
+    const updateTask = jest.fn().mockRejectedValueOnce(new AppError('conflict', 'Someone changed this task.')).mockResolvedValue(undefined);
     const { result } = await renderHook(() => usePlanSync(), {
-      wrapper: wrapperFor(
-        fakePlan({ updateTask, getTask: async () => latest }),
-        outbox,
-      ),
+      wrapper: wrapperFor(fakePlan({ updateTask, getTask: async () => latest }), outbox),
     });
 
-    await act(async () =>
-      result.current.enqueueUpdate(TASK, { ...INPUT, status: "completed" }),
-    );
+    await act(async () => result.current.enqueueUpdate(TASK, { ...INPUT, status: 'completed' }));
     await act(async () => result.current.syncNow());
     await waitFor(() => expect(result.current.pending[0]?.conflict).toBe(true));
 
-    await act(async () =>
-      result.current.keepMine(result.current.pending[0]?.clientId ?? ""),
-    );
+    await act(async () => result.current.keepMine(result.current.pending[0]?.clientId ?? ''));
     await waitFor(() => expect(outbox.items()).toHaveLength(0));
     expect(updateTask).toHaveBeenLastCalledWith(
-      "biz-1",
-      "task-1",
+      'biz-1',
+      'task-1',
       expect.objectContaining({
-        title: "Fix the north fence",
-        status: "completed",
+        title: 'Fix the north fence',
+        status: 'completed',
       }),
       5,
     );
   });
 });
 
-describe("useSuggestionViewModel (Plan section 4.6)", () => {
+describe('usePlanSync for goals, milestones and events (Plan section 8)', () => {
+  it('sends a goal and a milestone captured offline with their client ids, once each', async () => {
+    const outbox = memoryOutbox();
+    const createGoal = jest.fn(async () => 'goal-9');
+    const addMilestone = jest.fn(async () => undefined);
+    const setMilestoneStatus = jest.fn(async () => undefined);
+    const { result } = await renderHook(() => usePlanSync(), { wrapper: wrapperFor(fakePlan({ createGoal, addMilestone, setMilestoneStatus }), outbox) });
+    const goal = { title: 'Open a shop', description: null, goalType: 'milestone' as const, direction: null, unit: null, baselineValue: null, targetValue: null, tolerance: null, kpiCode: null, startOn: '2026-11-20', targetOn: null, status: 'active' as const, statusReason: null };
+
+    await act(async () => result.current.enqueueGoal(goal));
+    await act(async () => result.current.enqueueMilestone({ id: 'goal-1', title: 'Grow sales' }, { title: 'Get quotes', dueOn: null, sortOrder: 2 }));
+    await act(async () => result.current.enqueueMilestoneStatus({ id: 'm-1', title: 'Find a site' }, 'completed'));
+    await act(async () => result.current.syncNow());
+
+    await waitFor(() => expect(outbox.items()).toHaveLength(0));
+    expect(createGoal).toHaveBeenCalledWith('biz-1', goal, { clientId: expect.any(String) });
+    expect(addMilestone).toHaveBeenCalledWith('biz-1', 'goal-1', expect.objectContaining({ title: 'Get quotes', sortOrder: 2, clientId: expect.any(String) }));
+    expect(setMilestoneStatus).toHaveBeenCalledWith('m-1', 'completed');
+  });
+});
+
+describe('useSuggestionViewModel (Plan section 4.6)', () => {
   const SUGGESTION: Suggestion = {
-    id: "s1",
-    kind: "weekly_plan",
+    id: 's1',
+    kind: 'weekly_plan',
     goalId: null,
-    request: "Free mornings",
-    title: "This week",
-    explanation: "Focus on buyers.",
+    request: 'Free mornings',
+    title: 'This week',
+    explanation: 'Focus on buyers.',
     assumptions: null,
-    limitations: "Sales cover 30 days.",
+    limitations: 'Sales cover 30 days.',
     sources: [],
-    periodStart: "2026-11-20",
-    periodEnd: "2026-11-26",
-    generator: "ai",
-    model: "claude-opus-5-5",
-    status: "open",
-    generatedAt: "2026-11-20T06:00:00Z",
+    periodStart: '2026-11-20',
+    periodEnd: '2026-11-26',
+    generator: 'ai',
+    model: 'claude-opus-5-5',
+    status: 'open',
+    generatedAt: '2026-11-20T06:00:00Z',
+    insightKpi: null,
+    insightTitle: null,
     actions: [
       {
-        id: "a1",
-        type: "create_task",
-        payload: { title: "Call buyers", due_on: "2026-11-21" },
+        id: 'a1',
+        type: 'create_task',
+        payload: { title: 'Call buyers', due_on: '2026-11-21' },
         finalPayload: null,
-        why: "Overdue",
-        status: "proposed",
+        why: 'Overdue',
+        status: 'proposed',
         createdTaskId: null,
         createdGoalId: null,
         createdEventId: null,
@@ -230,67 +234,49 @@ describe("useSuggestionViewModel (Plan section 4.6)", () => {
     ],
   };
 
-  it("labels the suggestion with its model and date, and sends only the fields a person changed", async () => {
-    const acceptAction = jest.fn(async () => "task-1");
-    const { result } = await renderHook(
-      () => useSuggestionViewModel("s1", { onReplaced: jest.fn() }),
-      {
-        wrapper: wrapperFor(
-          fakePlan({ getSuggestion: async () => SUGGESTION, acceptAction }),
-          memoryOutbox(),
-        ),
-      },
-    );
+  it('labels the suggestion with its model and date, and sends only the fields a person changed', async () => {
+    const acceptAction = jest.fn(async () => 'task-1');
+    const { result } = await renderHook(() => useSuggestionViewModel('s1', { onReplaced: jest.fn() }), {
+      wrapper: wrapperFor(fakePlan({ getSuggestion: async () => SUGGESTION, acceptAction }), memoryOutbox()),
+    });
     await waitFor(() => expect(result.current.suggestion).not.toBeNull());
-    expect(result.current.origin).toMatch(
-      /Drafted by Verida's AI \(claude-opus-5-5\)/,
-    );
+    expect(result.current.origin).toMatch(/Drafted by Verida's AI \(claude-opus-5-5\)/);
     expect(result.current.actions[0]).toMatchObject({
-      verb: "Add task",
-      heading: "Call buyers",
+      verb: 'Add task',
+      heading: 'Call buyers',
       open: true,
     });
 
-    await act(async () => result.current.startEdit("a1"));
-    await act(async () =>
-      result.current.setDraftField("title", "Call two buyers"),
-    );
+    await act(async () => result.current.startEdit('a1'));
+    await act(async () => result.current.setDraftField('title', 'Call two buyers'));
     await act(async () => result.current.saveEdit());
     await waitFor(() =>
-      expect(acceptAction).toHaveBeenCalledWith("a1", {
-        title: "Call two buyers",
+      expect(acceptAction).toHaveBeenCalledWith('a1', {
+        title: 'Call two buyers',
       }),
     );
-    expect(mockFeedback.success).toHaveBeenCalledWith("Added to your plan.");
+    expect(mockFeedback.success).toHaveBeenCalledWith('Added to your plan.');
   });
 
-  it("asks again with the same request and opens the new suggestion", async () => {
+  it('asks again with the same request and opens the new suggestion', async () => {
     const suggest = jest.fn(async () => ({
-      suggestionId: "s2",
-      source: "rules" as const,
+      suggestionId: 's2',
+      source: 'rules' as const,
     }));
     const onReplaced = jest.fn();
-    const { result } = await renderHook(
-      () => useSuggestionViewModel("s1", { onReplaced }),
-      {
-        wrapper: wrapperFor(
-          fakePlan({ getSuggestion: async () => SUGGESTION }),
-          memoryOutbox(),
-          { suggest },
-        ),
-      },
-    );
+    const { result } = await renderHook(() => useSuggestionViewModel('s1', { onReplaced }), {
+      wrapper: wrapperFor(fakePlan({ getSuggestion: async () => SUGGESTION }), memoryOutbox(), { suggest }),
+    });
     await waitFor(() => expect(result.current.canRegenerate).toBe(true));
     await act(async () => result.current.regenerate());
-    await waitFor(() => expect(onReplaced).toHaveBeenCalledWith("s2"));
+    await waitFor(() => expect(onReplaced).toHaveBeenCalledWith('s2'));
     expect(suggest).toHaveBeenCalledWith({
-      businessId: "biz-1",
-      kind: "weekly_plan",
+      businessId: 'biz-1',
+      kind: 'weekly_plan',
       goalId: null,
-      request: "Free mornings",
+      request: 'Free mornings',
+      insight: null,
     });
-    expect(mockFeedback.success).toHaveBeenCalledWith(
-      expect.stringMatching(/built-in planning rules/),
-    );
+    expect(mockFeedback.success).toHaveBeenCalledWith(expect.stringMatching(/built-in planning rules/));
   });
 });

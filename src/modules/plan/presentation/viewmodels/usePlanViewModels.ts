@@ -2,6 +2,8 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import { useEffect, useMemo, useState } from 'react';
 
 import { AppError, errorMessage } from '@/core/errors/AppError';
+import { chooseDocument, choosePhoto, takePhoto } from '@/core/files/pickFile';
+import { isPdf, type PickedFile } from '@/core/files/types';
 import { formatDate as formatDay, todayIso } from '@/core/format/format';
 import { useForm } from '@/core/forms/useForm';
 import { businessScope } from '@/core/query/queryClient';
@@ -30,6 +32,8 @@ import { EVENT_TYPE_LABELS, WEEKDAY_SHORT, addDays, describeChanges, describeRul
 import { commentFormSchema, goalFormSchema, milestoneFormSchema, progressFormSchema, reminderFormSchema, ruleFields, taskFormSchema } from '../../domain/validation';
 import { usePlanDependencies } from '../di';
 import { isOffline, usePlanSync } from './usePlanSync';
+
+const MAX_ATTACHMENTS = 10;
 
 const daysFrom = addDays;
 
@@ -252,6 +256,7 @@ export function useTaskListViewModel() {
 
 export function useGoalListViewModel() {
   const { can, scope, goals, enabled } = usePlanQueries();
+  const sync = usePlanSync();
   const [showClosed, setShowClosed] = useState(false);
   const list = (goals.data ?? []).filter((goal) => showClosed || !['completed', 'cancelled', 'expired'].includes(goal.status));
   const withProgress = useGoalsWithProgress(list, scope);
@@ -260,6 +265,7 @@ export function useGoalListViewModel() {
     error: goals.error ? errorMessage(goals.error) : null,
     retry: () => void goals.refetch(),
     canCreate: can('plan.goals'),
+    sync,
     showClosed,
     toggleClosed: () => setShowClosed((value) => !value),
     items: withProgress.map(goalCard),
@@ -296,6 +302,8 @@ type TaskFormArgs = {
   onSeriesCreated?: (ruleId: string) => void;
   // Section 8: the task was kept on this device because there is no connection.
   onQueued?: () => void;
+  // Journey 5.1: values handed over by Ask Verida, which the person reviews before saving.
+  prefill?: { title?: string; dueOn?: string };
 };
 
 export const TASK_REMINDER_OPTIONS = [
@@ -304,7 +312,7 @@ export const TASK_REMINDER_OPTIONS = [
   { value: 'before', label: 'The evening before (18:00)' },
 ];
 
-export function useTaskFormViewModel({ taskId, goalId, onDone, onSeriesCreated, onQueued }: TaskFormArgs) {
+export function useTaskFormViewModel({ taskId, goalId, onDone, onSeriesCreated, onQueued, prefill }: TaskFormArgs) {
   const { plan, business, can, scope, goals, settings } = usePlanQueries();
   const sync = usePlanSync();
   // Journey 5.1 step 5: a reminder can be asked for while creating the task.
@@ -312,7 +320,13 @@ export function useTaskFormViewModel({ taskId, goalId, onDone, onSeriesCreated, 
   const members = useMemberOptions();
   const feedback = useFeedback();
   const queryClient = useQueryClient();
-  const form = useForm(taskFormSchema, { ...NEW_TASK, goalIds: goalId ?? '', startsOn: todayIso() });
+  const form = useForm(taskFormSchema, {
+    ...NEW_TASK,
+    title: prefill?.title?.slice(0, 160) ?? '',
+    dueOn: prefill?.dueOn && /^\d{4}-\d{2}-\d{2}$/.test(prefill.dueOn) ? prefill.dueOn : '',
+    goalIds: goalId ?? '',
+    startsOn: todayIso(),
+  });
   const { reset } = form;
   const [editScope, setEditScope] = useState<EditScope>('one');
   const existing = useQuery({ queryKey: [...scope, 'tasks', taskId], queryFn: () => plan.getTask(taskId ?? ''), enabled: Boolean(taskId) });
@@ -494,7 +508,7 @@ const SNOOZE_CHOICES = [
 
 export function useTaskDetailViewModel(taskId: string) {
   const { plan, business, userId, can, scope, goals } = usePlanQueries();
-  const { links: linkSource } = usePlanDependencies();
+  const { links: linkSource, files } = usePlanDependencies();
   const sync = usePlanSync();
   const origin = useQuery({ queryKey: [...scope, 'tasks', taskId, 'origin'], queryFn: () => plan.taskOrigin(taskId) });
   const taskLinks = useQuery({ queryKey: [...scope, 'tasks', taskId, 'links'], queryFn: () => plan.listTaskLinks(taskId) });
@@ -605,6 +619,39 @@ export function useTaskDetailViewModel(taskId: string) {
     ...report,
   });
   const removeLink = useMutation({ mutationFn: (id: string) => plan.removeTaskLink(id), onSuccess: refresh, ...report });
+
+  // Photos and PDFs on the task, shown through short-lived links because the files are private.
+  const paths = task.data?.attachmentPaths ?? [];
+  const fileLinks = useQuery({ queryKey: [...scope, 'tasks', taskId, 'files', paths], queryFn: () => files.linksFor(paths), enabled: paths.length > 0 });
+  const attach = useMutation({
+    mutationFn: async (pick: () => Promise<PickedFile | null>) => {
+      const picked = await pick();
+      if (!picked) return false;
+      const path = await files.upload(business.id, 'plan', picked);
+      try {
+        await plan.setTaskAttachments(taskId, [...paths, path]);
+      } catch (error) {
+        // The task did not take the file, so it is not kept.
+        await files.remove(path).catch(() => undefined);
+        throw error;
+      }
+      return true;
+    },
+    onSuccess: async (added) => {
+      if (!added) return;
+      await refresh();
+      feedback.success('File attached.');
+    },
+    ...report,
+  });
+  const detach = useMutation({
+    mutationFn: async (path: string) => {
+      await plan.setTaskAttachments(taskId, paths.filter((existing) => existing !== path));
+      await files.remove(path).catch(() => undefined);
+    },
+    onSuccess: refresh,
+    ...report,
+  });
 
   const addComment = useMutation({
     mutationFn: (body: string) => plan.addComment(business.id, taskId, body),
@@ -731,6 +778,15 @@ export function useTaskDetailViewModel(taskId: string) {
     snooze: (id: string, minutes: number) => snooze.mutate({ id, minutes }),
     dismissReminder: (id: string) => dismiss.mutate(id),
 
+    // Attachments (section 10 and open decision 6).
+    attachments: paths.map((path) => ({ path, url: fileLinks.data?.[path] ?? '', isPdf: isPdf(path), name: path.split('/').pop() ?? path })),
+    canAttach: canEdit && paths.length < MAX_ATTACHMENTS,
+    attaching: attach.isPending,
+    takePhoto: () => attach.mutate(takePhoto),
+    choosePhoto: () => attach.mutate(choosePhoto),
+    chooseDocument: () => attach.mutate(() => chooseDocument(['application/pdf', 'image/*'])),
+    removeAttachment: (path: string) => detach.mutate(path),
+
     // Section 4.6: a task added from a suggestion keeps a link back to it.
     origin: origin.data ? { suggestionId: origin.data.suggestionId, label: `Added from a ${origin.data.generator === 'ai' ? 'Verida AI' : 'Verida'} suggestion on ${formatDay(origin.data.generatedAt.slice(0, 10))}` } : null,
     // A change to this task still waiting on this device.
@@ -791,8 +847,9 @@ const NEW_GOAL = {
 
 const numberText = (value: number | null) => (value === null ? '' : String(value));
 
-export function useGoalFormViewModel({ goalId, onDone }: { goalId?: string; onDone: (id: string) => void }) {
+export function useGoalFormViewModel({ goalId, onDone, onQueued }: { goalId?: string; onDone: (id: string) => void; onQueued?: () => void }) {
   const { plan, business, can, scope } = usePlanQueries();
+  const sync = usePlanSync();
   const feedback = useFeedback();
   const queryClient = useQueryClient();
   const form = useForm(goalFormSchema, { ...NEW_GOAL, startOn: todayIso() });
@@ -827,7 +884,16 @@ export function useGoalFormViewModel({ goalId, onDone }: { goalId?: string; onDo
       feedback.success(goalId ? 'Goal updated.' : 'Goal created.');
       onDone(id);
     },
-    onError: (error) => feedback.error(errorMessage(error)),
+    onError: async (error, input) => {
+      // Section 8: a new goal made without a connection waits on this device.
+      if (isOffline(error) && !goalId) {
+        await sync.enqueueGoal(input);
+        feedback.success('No connection. Saved on this device; it will sync when you are back online.');
+        if (onQueued) onQueued();
+        return;
+      }
+      feedback.error(errorMessage(error));
+    },
   });
 
   return {
@@ -855,6 +921,7 @@ export function useGoalFormViewModel({ goalId, onDone }: { goalId?: string; onDo
 
 export function useGoalDetailViewModel(goalId: string) {
   const { plan, business, can, scope, tasks } = usePlanQueries();
+  const sync = usePlanSync();
   const feedback = useFeedback();
   const queryClient = useQueryClient();
   const goal = useQuery({ queryKey: [...scope, 'goals', goalId], queryFn: () => plan.getGoal(goalId) });
@@ -882,18 +949,36 @@ export function useGoalDetailViewModel(goalId: string) {
     },
     ...report,
   });
+  const offlineNote = 'No connection. Saved on this device; it will sync when you are back online.';
   const addMilestone = useMutation({
     mutationFn: (input: { title: string; dueOn: string | null }) => plan.addMilestone(business.id, goalId, { ...input, sortOrder: (milestones.data ?? []).length + 1 }),
     onSuccess: async () => {
       milestoneForm.reset({ title: '', dueOn: '' });
       await refresh();
     },
-    ...report,
+    onError: async (error, input) => {
+      // Section 8: offline, the milestone waits on this device.
+      if (isOffline(error) && goal.data) {
+        await sync.enqueueMilestone(goal.data, { ...input, sortOrder: (milestones.data ?? []).length + 1 });
+        milestoneForm.reset({ title: '', dueOn: '' });
+        feedback.success(offlineNote);
+        return;
+      }
+      feedback.error(errorMessage(error));
+    },
   });
   const toggleMilestone = useMutation({
     mutationFn: ({ id, done }: { id: string; done: boolean }) => plan.setMilestoneStatus(id, done ? 'completed' : 'pending'),
     onSuccess: refresh,
-    ...report,
+    onError: async (error, { id, done }) => {
+      const milestone = (milestones.data ?? []).find((item) => item.id === id);
+      if (isOffline(error) && milestone) {
+        await sync.enqueueMilestoneStatus(milestone, done ? 'completed' : 'pending');
+        feedback.success(offlineNote);
+        return;
+      }
+      feedback.error(errorMessage(error));
+    },
   });
   const removeMilestone = useMutation({ mutationFn: (id: string) => plan.removeMilestone(id), onSuccess: refresh, ...report });
   const addMeasure = useMutation({
@@ -948,6 +1033,7 @@ export function useGoalDetailViewModel(goalId: string) {
     followsKpi: Boolean(current?.kpiCode),
     canManage,
     canAddTask: can('plan.tasks'),
+    sync,
     milestones: (milestones.data ?? []).map((m) => ({ ...m, done: m.status === 'completed' })),
     // Section 4.2 and 4.5: every recorded observation, newest first, with who recorded it.
     observations: (observations.data ?? []).map((entry) => ({ ...entry, recordedBy: members.nameOf(entry.createdBy) })),

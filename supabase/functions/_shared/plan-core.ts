@@ -86,13 +86,20 @@ const KIND_INSTRUCTIONS: Record<PlanKind, string> = {
   weekly_plan: 'Help me plan the next seven days: what to finish, what to move, and what to start, using my goals, open tasks, deadlines and figures.',
   goal_breakdown: 'Break the goal in <focus_goal> into a few milestones and tasks I can start this week.',
   insight_actions:
-    'Look at my figures. Suggest actions for what they show, and for any measure that is unavailable or estimated, what to record so it can be calculated. Do not claim causes.',
+    'Look at my figures, and at the insight in <focus_insight> if there is one. Suggest actions for what they show, and for any measure that is unavailable or estimated, what to record so it can be calculated. Do not claim causes.',
   request: 'Answer my request below with a short plan of concrete actions.',
 };
 
 const line = (value: string | number | null | undefined) => (value === null || value === undefined || value === '' ? 'none' : String(value));
 
-export function buildPlanRequest(context: PlanContext, kind: PlanKind, options: { request: string | null; focusGoalId: string | null }): string {
+// Journey 5.3: the insight a person asked about, as the Insights screen showed it.
+export type FocusInsight = { kpiCode: string | null; title: string; body: string; evidence: string };
+
+export function buildPlanRequest(
+  context: PlanContext,
+  kind: PlanKind,
+  options: { request: string | null; focusGoalId: string | null; focusInsight?: FocusInsight | null },
+): string {
   const goals = context.goals
     .map(
       (goal) =>
@@ -126,7 +133,11 @@ Last 7 days: ${o ? `${o.openTasks} open, ${o.overdueTasks} overdue, ${o.blockedT
 </plan>
 <business_figures period="last 30 days">
 ${figures || 'none recorded'}
-</business_figures>${focus ? `\n<focus_goal>id ${focus.id}: ${focus.title}</focus_goal>` : ''}
+</business_figures>${focus ? `\n<focus_goal>id ${focus.id}: ${focus.title}</focus_goal>` : ''}${
+    options.focusInsight
+      ? `\n<focus_insight>\n${options.focusInsight.title}\n${options.focusInsight.body}\nBased on: ${options.focusInsight.evidence}${options.focusInsight.kpiCode ? `\nMeasure: ${options.focusInsight.kpiCode}` : ''}\n</focus_insight>`
+      : ''
+  }
 <request>
 ${options.request?.trim() || 'No extra details.'}
 </request>

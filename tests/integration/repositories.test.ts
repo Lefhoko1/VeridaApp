@@ -729,4 +729,34 @@ describe('plan', () => {
     expect(events.length).toBeGreaterThanOrEqual(1);
     expect(events[0]).toMatchObject({ ruleId: eventRule, startTime: '08:00', endTime: '12:00' });
   });
+
+  it('makes offline goals, milestones and events once, and links a task from an insight to its measure (Plan gaps)', async () => {
+    const { client } = await newUser('Gap closer');
+    const id = await newBusiness(client, { name: 'Gap Farm' });
+    const plan = new SupabasePlanRepository(client);
+    const today = new Date().toISOString().slice(0, 10);
+
+    const goal = { title: 'Open a shop', description: null, goalType: 'milestone' as const, direction: null, unit: null, baselineValue: null, targetValue: null, tolerance: null, kpiCode: null, startOn: today, targetOn: null, status: 'active' as const, statusReason: null };
+    const offline = { clientId: '7d1c2a52-3c1e-4bd4-9f6f-2c4f1d8a7b03' };
+    const goalId = await plan.createGoal(id, goal, offline);
+    expect(await plan.createGoal(id, goal, offline)).toBe(goalId);
+    expect((await plan.listGoals(id)).filter((g) => g.title === 'Open a shop')).toHaveLength(1);
+
+    const milestone = { title: 'Get quotes', dueOn: null, sortOrder: 1, clientId: '8d1c2a52-3c1e-4bd4-9f6f-2c4f1d8a7b04' };
+    await plan.addMilestone(id, goalId, milestone);
+    await plan.addMilestone(id, goalId, milestone);
+    expect(await plan.listMilestones(goalId)).toHaveLength(1);
+
+    const event = { title: 'Market day', description: null, eventType: 'delivery' as const, startsOn: today, startTime: null, endTime: null, status: 'scheduled' as const };
+    const eventOffline = { clientId: '9d1c2a52-3c1e-4bd4-9f6f-2c4f1d8a7b05' };
+    const eventId = await plan.createEvent(id, event, eventOffline);
+    expect(await plan.createEvent(id, event, eventOffline)).toBe(eventId);
+
+    const suggestionId = await plan.suggestFromRules(id, 'insight_actions', null, null, { kpiCode: 'revenue', title: 'Revenue is down 20%', body: '', evidence: '' });
+    const suggestion = await plan.getSuggestion(suggestionId!);
+    expect(suggestion).toMatchObject({ insightKpi: 'revenue', insightTitle: 'Revenue is down 20%' });
+    const taskId = await plan.acceptAction(suggestion.actions[0]!.id, {});
+    expect(await plan.listTaskLinks(taskId)).toEqual([expect.objectContaining({ type: 'kpi', kpiCode: 'revenue', label: 'Revenue is down 20%' })]);
+    expect((await plan.getTask(taskId)).attachmentPaths).toEqual([]);
+  });
 });

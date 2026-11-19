@@ -8,7 +8,7 @@ export type PickedFile = {
 };
 
 // Where a business keeps its files. Each folder follows the permission of the data it belongs to.
-export type BusinessFileFolder = 'receipts' | 'products' | 'logo';
+export type BusinessFileFolder = 'receipts' | 'products' | 'logo' | 'plan';
 
 // A business's stored files: receipts, product photos and its logo. Files are private, so they are
 // shown through short-lived links.

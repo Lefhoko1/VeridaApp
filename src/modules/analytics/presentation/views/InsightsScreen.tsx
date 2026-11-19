@@ -1,9 +1,9 @@
 import { StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 
-import { CardGrid, EmptyState, ErrorView, GroupedBarChart, Kicker, LoadingView, Notice, Panel, Screen, SectionHeader, supporting, HeroCard, IconTile, Row, spacing, type TileTone } from '@/design-system';
+import { Button, CardGrid, EmptyState, ErrorView, GroupedBarChart, Kicker, LoadingView, Notice, Panel, Screen, SectionHeader, supporting, HeroCard, IconTile, Row, spacing, type TileTone } from '@/design-system';
 
-import type { InsightKind } from '../../domain/models';
+import type { Insight, InsightKind } from '../../domain/models';
 import { PeriodSelector } from '../components/PeriodSelector';
 import { useInsightsViewModel } from '../viewmodels/useAnalyticsViewModels';
 
@@ -14,7 +14,8 @@ const KIND: Record<InsightKind, { label: string; icon: string; tone: TileTone }>
   data_quality: { label: 'Data quality', icon: 'database-alert-outline', tone: 'neutral' },
 };
 
-export function InsightsScreen() {
+// Plan journey 5.3: from an insight to planned actions. The route decides where that opens.
+export function InsightsScreen({ onPlanAction }: { onPlanAction?: (insight: Insight) => void }) {
   const vm = useInsightsViewModel();
 
   return (
@@ -48,6 +49,11 @@ export function InsightsScreen() {
               {insight.body}
             </Text>
             <Text style={styles.evidence}>Based on: {insight.evidence}</Text>
+            {onPlanAction && vm.canPlan && insight.id !== 'getting-started' && insight.id !== 'data-readiness' ? (
+              <Button compact mode="outlined" icon="calendar-check-outline" onPress={() => onPlanAction(insight)}>
+                Plan an action
+              </Button>
+            ) : null}
           </Panel>
           ))}
         </CardGrid>

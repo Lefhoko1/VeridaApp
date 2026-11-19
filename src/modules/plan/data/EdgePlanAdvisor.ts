@@ -19,7 +19,7 @@ export class EdgePlanAdvisor implements PlanAdvisor {
 
   async suggest(request: SuggestionRequest): Promise<SuggestionResult> {
     const { data, error } = await this.client.functions.invoke('plan-assist', {
-      body: { businessId: request.businessId, kind: request.kind, goalId: request.goalId ?? null, request: request.request ?? null },
+      body: { businessId: request.businessId, kind: request.kind, goalId: request.goalId ?? null, request: request.request ?? null, insight: request.insight ?? null },
     });
     if (!error) {
       const parsed = resultSchema.safeParse(data);
@@ -28,7 +28,7 @@ export class EdgePlanAdvisor implements PlanAdvisor {
     // A refusal for lack of permission is the same answer from the rules, so it is not retried.
     const status = (error as { context?: { status?: number } } | null)?.context?.status;
     if (status === 403) throw new AppError('forbidden', 'You do not have permission to plan for this business.');
-    const id = await this.plan.suggestFromRules(request.businessId, request.kind, request.goalId ?? null, request.request ?? null);
+    const id = await this.plan.suggestFromRules(request.businessId, request.kind, request.goalId ?? null, request.request ?? null, request.insight ?? null);
     return { suggestionId: id, source: 'rules' };
   }
 }

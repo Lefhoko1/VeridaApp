@@ -34,6 +34,7 @@ const OCCURRENCE: Task = {
   completedOn: null,
   ruleId: 'rule-1',
   occurrenceOn: '2026-11-20',
+  attachmentPaths: [],
 };
 
 const RULE: RecurringRule = {
@@ -95,11 +96,14 @@ function setup(plan: PlanRepository) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity }, mutations: { gcTime: Infinity } } });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>
-      <PlanDependenciesProvider value={{ plan, advisor: { suggest: jest.fn() }, outbox: memoryOutbox(), links: noLinks }}>{children}</PlanDependenciesProvider>
+      <PlanDependenciesProvider value={{ plan, advisor: { suggest: jest.fn() }, outbox: memoryOutbox(), links: noLinks, files: noFiles }}>{children}</PlanDependenciesProvider>
     </QueryClientProvider>
   );
   return { wrapper, onDone: jest.fn(), onSeriesCreated: jest.fn() };
 }
+
+// No file storage is used by these tests.
+const noFiles = { upload: jest.fn(), linkFor: jest.fn(), linksFor: jest.fn(async () => ({})), remove: jest.fn() };
 
 beforeEach(() => jest.clearAllMocks());
 

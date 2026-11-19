@@ -9,7 +9,9 @@ import {
   SUGGESTION_KIND_LABELS,
   actionNeedsGoalsPermission,
   describeAction,
+  questionAbout,
   type ActionEdits,
+  type FocusInsight,
   type PlanSettings,
   type SuggestedAction,
   type Suggestion,
@@ -24,17 +26,26 @@ const RULES_NOTE = 'The AI service was not available, so these come from Veridaâ
 
 // Section 4.6: asking Verida for help. Nothing is created here: the result is a suggestion for
 // the person to review.
-export function usePlanAssistViewModel({ kind, goalId, onDone }: { kind?: SuggestionKind; goalId?: string; onDone: (suggestionId: string) => void }) {
+type AssistArgs = { kind?: SuggestionKind; goalId?: string; insight?: FocusInsight; onDone: (suggestionId: string) => void };
+
+export function usePlanAssistViewModel({ kind, goalId, insight, onDone }: AssistArgs) {
   const { business, can, scope, goals } = usePlanQueries();
   const { advisor } = usePlanDependencies();
   const feedback = useFeedback();
   const queryClient = useQueryClient();
-  const [chosenKind, setKind] = useState<SuggestionKind>(kind ?? (goalId ? 'goal_breakdown' : 'weekly_plan'));
+  const [chosenKind, setKind] = useState<SuggestionKind>(kind ?? (insight ? 'insight_actions' : goalId ? 'goal_breakdown' : 'weekly_plan'));
   const [chosenGoal, setGoal] = useState(goalId ?? '');
   const [request, setRequest] = useState('');
 
   const ask = useMutation({
-    mutationFn: () => advisor.suggest({ businessId: business.id, kind: chosenKind, goalId: chosenKind === 'goal_breakdown' ? chosenGoal : null, request: request.trim() || null }),
+    mutationFn: () =>
+      advisor.suggest({
+        businessId: business.id,
+        kind: chosenKind,
+        goalId: chosenKind === 'goal_breakdown' ? chosenGoal : null,
+        request: request.trim() || null,
+        insight: chosenKind === 'insight_actions' ? (insight ?? null) : null,
+      }),
     onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: [...scope, 'suggestions'] });
       if (!result.suggestionId) {
@@ -50,6 +61,8 @@ export function usePlanAssistViewModel({ kind, goalId, onDone }: { kind?: Sugges
   const openGoals = (goals.data ?? []).filter((goal) => ['active', 'at_risk', 'on_hold'].includes(goal.status));
   return {
     canAsk: can('plan.tasks'),
+    // Journey 5.3: shown so the person knows what Verida will plan from.
+    insight: chosenKind === 'insight_actions' ? (insight ?? null) : null,
     kind: chosenKind,
     kindOptions,
     setKind: (value: string) => setKind(value as SuggestionKind),
@@ -131,7 +144,14 @@ export function useSuggestionViewModel(suggestionId: string, { onReplaced }: { o
     ...report,
   });
   const regenerate = useMutation({
-    mutationFn: (current: Suggestion) => advisor.suggest({ businessId: business.id, kind: current.kind, goalId: current.goalId, request: current.request }),
+    mutationFn: (current: Suggestion) =>
+      advisor.suggest({
+        businessId: business.id,
+        kind: current.kind,
+        goalId: current.goalId,
+        request: current.request,
+        insight: current.insightTitle ? { kpiCode: current.insightKpi, title: current.insightTitle, body: '', evidence: '' } : null,
+      }),
     onSuccess: async (result) => {
       await refresh();
       if (result.source === 'rules') feedback.success(RULES_NOTE);
@@ -157,6 +177,9 @@ export function useSuggestionViewModel(suggestionId: string, { onReplaced }: { o
         : `From Verida's built-in planning rules, on ${formatDate(current.generatedAt.slice(0, 10))}.`
       : '',
     period: current?.periodStart && current.periodEnd ? `${formatDate(current.periodStart)} to ${formatDate(current.periodEnd)}` : null,
+    insightTitle: current?.insightTitle ?? null,
+    // The wireframe's "Ask Verida": a question about this suggestion, for the person to send.
+    askQuestion: current ? questionAbout(current, current.actions[0] ? { ...describeAction(current.actions[0], goalTitle, formatDate), why: current.actions[0].why } : null) : '',
     statusNote:
       current?.status === 'superseded' ? 'A newer suggestion replaced this one.' : current?.status === 'dismissed' ? 'This suggestion was dismissed.' : current?.status === 'decided' ? 'Everything in this suggestion has been decided.' : null,
     actions: (current?.actions ?? []).map((action) => ({
@@ -228,6 +251,7 @@ export function useSuggestionsPanelViewModel() {
       first && next
         ? {
             suggestionId: first.id,
+            askQuestion: questionAbout(first, { ...describeAction(next, goalTitle, formatDate), why: next.why }),
             title: first.title,
             generator: first.generator,
             explanation: first.explanation,

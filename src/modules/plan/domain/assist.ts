@@ -2,7 +2,8 @@
 // settings (sections 3 and 13), links from tasks to records (4.3), related measures (4.2) and
 // offline capture (section 8). Plain TypeScript, no React or Supabase.
 
-import type { TaskInput, TaskPriority, TaskStatus } from './models';
+import type { GoalInput, TaskInput, TaskPriority, TaskStatus } from './models';
+import type { EventInput } from './schedule';
 
 // ---------------------------------------------------------------------------------------------
 // Suggestions.
@@ -67,10 +68,22 @@ export type Suggestion = {
   model: string | null;
   status: 'open' | 'decided' | 'dismissed' | 'superseded';
   generatedAt: string;
+  // Journey 5.3: the insight it was asked from, if any.
+  insightKpi: string | null;
+  insightTitle: string | null;
   actions: SuggestedAction[];
 };
 
-export type SuggestionRequest = { businessId: string; kind: SuggestionKind; goalId?: string | null; request?: string | null };
+// A question for Ask Verida about a suggestion. It names the suggestion and its reason, never people.
+export function questionAbout(suggestion: Pick<Suggestion, 'title'>, action: { verb: string; heading: string; why: string | null } | null): string {
+  const what = action ? ` It proposes: ${action.verb.toLowerCase()} "${action.heading}"${action.why ? `, because ${action.why.replace(/[.\s]+$/, '')}` : ''}.` : '';
+  return `Verida suggested "${suggestion.title}" for my plan.${what} Can you explain whether this makes sense for my business and what I should check first?`;
+}
+
+// Journey 5.3: the insight a person asked about, as the Insights screen showed it.
+export type FocusInsight = { kpiCode: string | null; title: string; body: string; evidence: string };
+
+export type SuggestionRequest = { businessId: string; kind: SuggestionKind; goalId?: string | null; request?: string | null; insight?: FocusInsight | null };
 
 // The outcome of asking: which suggestion was made, and whether the AI or the built-in rules made it.
 export type SuggestionResult = { suggestionId: string | null; source: 'ai' | 'rules' };
@@ -157,7 +170,12 @@ export type OutboxItem =
       // Set when someone else changed the task meanwhile: the person chooses what happens.
       conflict: boolean;
       error: string | null;
-    };
+    }
+  // Section 8: goals, milestones and events captured offline too. Each create carries a client id.
+  | { kind: 'create_goal'; clientId: string; recordedAt: string; input: GoalInput; error: string | null }
+  | { kind: 'create_event'; clientId: string; recordedAt: string; input: EventInput; error: string | null }
+  | { kind: 'create_milestone'; clientId: string; recordedAt: string; goalId: string; goalTitle: string; title: string; dueOn: string | null; sortOrder: number; error: string | null }
+  | { kind: 'set_milestone'; clientId: string; recordedAt: string; milestoneId: string; title: string; status: 'pending' | 'completed'; error: string | null };
 
 export type OutboxScope = { userId: string; businessId: string };
 
@@ -180,6 +198,10 @@ export function mergeOntoLatest(base: TaskInput, mine: TaskInput, latest: TaskIn
 // What a person sees for a change still on the device.
 export function describeOutboxItem(item: OutboxItem): { title: string; detail: string } {
   if (item.kind === 'create') return { title: item.input.title, detail: 'New task, waiting to sync' };
+  if (item.kind === 'create_goal') return { title: item.input.title, detail: 'New goal, waiting to sync' };
+  if (item.kind === 'create_event') return { title: item.input.title, detail: 'New event, waiting to sync' };
+  if (item.kind === 'create_milestone') return { title: item.title, detail: `New milestone for ${item.goalTitle}, waiting to sync` };
+  if (item.kind === 'set_milestone') return { title: item.title, detail: `Milestone marked ${item.status === 'completed' ? 'done' : 'not done'}, waiting to sync` };
   const status: Record<TaskStatus, string> = { not_started: 'not started', in_progress: 'in progress', blocked: 'blocked', completed: 'completed', cancelled: 'cancelled' };
   return {
     title: item.taskTitle,

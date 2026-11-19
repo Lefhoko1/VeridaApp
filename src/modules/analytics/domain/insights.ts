@@ -40,6 +40,7 @@ export function generateInsights({ current, previous, period, formatValue }: Ins
         title: 'Your business story starts with a record',
         body: 'Add a sale, an expense or an operational activity. Verida will begin building a picture of your business.',
         evidence: evidence('No records'),
+        kpiCode: null,
       },
       {
         id: 'data-readiness',
@@ -47,6 +48,7 @@ export function generateInsights({ current, previous, period, formatValue }: Ins
         title: 'No formal records? That is okay.',
         body: 'Start with a few simple entries. Verida will show what is known and what information is still missing.',
         evidence: evidence('No records'),
+        kpiCode: null,
       },
     ];
   }
@@ -61,6 +63,7 @@ export function generateInsights({ current, previous, period, formatValue }: Ins
         title: `No ${code === 'revenue' ? 'sales' : 'expenses'} recorded`,
         body: `Without these, Verida cannot show ${kpi.name.toLowerCase()} for this period. ${kpi.requiredData} is needed.`,
         evidence: evidence('Your records'),
+        kpiCode: code,
       });
       continue;
     }
@@ -70,6 +73,7 @@ export function generateInsights({ current, previous, period, formatValue }: Ins
       title: `${kpi.name}: ${formatValue(kpi, kpi.value)}`,
       body: kpi.explanation,
       evidence: evidence(kpi.formulaText),
+      kpiCode: kpi.code,
     });
   }
 
@@ -87,6 +91,7 @@ export function generateInsights({ current, previous, period, formatValue }: Ins
       title: `${kpi.name} is ${describeChange(change)}${unusual ? ', an unusual change' : ''}`,
       body: `It moved from ${formatValue(kpi, before)} to ${formatValue(kpi, kpi.value)}. This may reflect real change or differences in what was recorded, so check your records before drawing a conclusion.`,
       evidence: evidence(`${kpi.name} compared with the previous period`),
+      kpiCode: kpi.code,
     });
   }
 
@@ -99,6 +104,7 @@ export function generateInsights({ current, previous, period, formatValue }: Ins
         title: `${kpi.name} is an estimate`,
         body: kpi.note,
         evidence: evidence(kpi.requiredData),
+        kpiCode: kpi.code,
       });
     }
   }
@@ -113,6 +119,7 @@ export function generateInsights({ current, previous, period, formatValue }: Ins
           title: `Next step: start tracking ${missingOperational.name.toLowerCase()}`,
           body: `${missingOperational.explanation} To calculate it, Verida needs: ${missingOperational.requiredData.toLowerCase()}.`,
           evidence: evidence(`${missingOperational.name} is unavailable`),
+          kpiCode: missingOperational.code,
         }
       : {
           id: 'next-step-habit',
@@ -120,6 +127,7 @@ export function generateInsights({ current, previous, period, formatValue }: Ins
           title: 'Keep building a consistent record-keeping habit',
           body: `You have ${records.value} records in this period. Regular records make patterns easier to see.`,
           evidence: evidence('Records captured'),
+          kpiCode: 'records_captured',
         },
   );
 

@@ -1,5 +1,5 @@
 import type { Goal, GoalInput, GoalProgress, KpiOption, Milestone, PlanOverview, ProgressEntry, ProgressObservation, Task, TaskInput } from './models';
-import type { ActionEdits, GoalMeasure, LinkTarget, PlanSettings, Suggestion, SuggestionKind, TaskLink } from './assist';
+import type { ActionEdits, FocusInsight, GoalMeasure, LinkTarget, PlanSettings, Suggestion, SuggestionKind, TaskLink } from './assist';
 import type { EventInput, EventRuleInput, PlanEvent, PlanReview, RecurringRule, Reminder, ReviewInput, RuleInput, RuleUpdate, ScheduleItem, TaskComment, TaskHistoryEntry } from './schedule';
 
 export interface PlanRepository {
@@ -13,12 +13,12 @@ export interface PlanRepository {
   listGoals(businessId: string): Promise<Goal[]>;
   getGoal(id: string): Promise<Goal>;
   goalProgress(goalId: string): Promise<GoalProgress>;
-  createGoal(businessId: string, input: GoalInput): Promise<string>;
+  createGoal(businessId: string, input: GoalInput, offline?: { clientId: string }): Promise<string>;
   updateGoal(id: string, input: GoalInput): Promise<void>;
   addProgress(businessId: string, goalId: string, entry: ProgressEntry): Promise<void>;
   listProgress(goalId: string): Promise<ProgressObservation[]>;
   listMilestones(goalId: string): Promise<Milestone[]>;
-  addMilestone(businessId: string, goalId: string, input: { title: string; dueOn: string | null; sortOrder: number }): Promise<void>;
+  addMilestone(businessId: string, goalId: string, input: { title: string; dueOn: string | null; sortOrder: number; clientId?: string }): Promise<void>;
   setMilestoneStatus(id: string, status: Milestone['status']): Promise<void>;
   removeMilestone(id: string): Promise<void>;
   kpiOptions(businessId: string): Promise<KpiOption[]>;
@@ -34,7 +34,7 @@ export interface PlanRepository {
   listOccurrences(ruleId: string): Promise<Task[]>;
   listEventOccurrences(ruleId: string): Promise<PlanEvent[]>;
   getEvent(id: string): Promise<PlanEvent>;
-  createEvent(businessId: string, input: EventInput): Promise<string>;
+  createEvent(businessId: string, input: EventInput, offline?: { clientId: string }): Promise<string>;
   updateEvent(id: string, input: EventInput): Promise<void>;
 
   // P1: reminders, comments and history.
@@ -56,7 +56,7 @@ export interface PlanRepository {
   // P2: suggestions from Verida (section 4.6).
   listSuggestions(businessId: string): Promise<Suggestion[]>;
   getSuggestion(id: string): Promise<Suggestion>;
-  suggestFromRules(businessId: string, kind: SuggestionKind, goalId: string | null, request: string | null): Promise<string | null>;
+  suggestFromRules(businessId: string, kind: SuggestionKind, goalId: string | null, request: string | null, insight?: FocusInsight | null): Promise<string | null>;
   acceptAction(actionId: string, edits: ActionEdits): Promise<string>;
   dismissAction(actionId: string): Promise<void>;
   dismissSuggestion(id: string): Promise<void>;
@@ -66,6 +66,8 @@ export interface PlanRepository {
   // Settings, links and measures.
   getSettings(businessId: string): Promise<PlanSettings>;
   saveSettings(businessId: string, settings: PlanSettings): Promise<void>;
+  // Files attached to a task, as paths in the business's private plan folder.
+  setTaskAttachments(taskId: string, paths: string[]): Promise<void>;
   listTaskLinks(taskId: string): Promise<TaskLink[]>;
   addTaskLink(businessId: string, taskId: string, target: LinkTarget): Promise<void>;
   removeTaskLink(id: string): Promise<void>;

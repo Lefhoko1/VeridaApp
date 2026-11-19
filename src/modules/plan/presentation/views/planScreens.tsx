@@ -3,6 +3,7 @@ import { Checkbox, Chip, Divider, IconButton, List, Searchbar, SegmentedButtons,
 
 import { formatDate, formatQuantity } from '@/core/format/format';
 import {
+  AttachmentGallery,
   BarRow,
   Button,
   ConfirmDialog,
@@ -58,6 +59,7 @@ export type PlanScreenProps = {
   onAssist: () => void;
   onOpenSuggestion: (id: string) => void;
   onOpenSettings: () => void;
+  onAskVerida: (question: string) => void;
 };
 
 // Section 1.2: Overview, Goals, Tasks, Schedule and Progress. Chips scroll sideways, so five
@@ -92,7 +94,7 @@ export function PlanScreen(props: PlanScreenProps) {
   }
 }
 
-function PlanOverview({ header, onNewTask, onNewGoal, onOpenTask, onOpenGoal, onOpenEvent, onShowSchedule, onAssist, onOpenSuggestion, onOpenSettings }: PlanScreenProps & { header: React.ReactNode; onShowSchedule: () => void }) {
+function PlanOverview({ header, onNewTask, onNewGoal, onOpenTask, onOpenGoal, onOpenEvent, onShowSchedule, onAssist, onOpenSuggestion, onOpenSettings, onAskVerida }: PlanScreenProps & { header: React.ReactNode; onShowSchedule: () => void }) {
   const vm = usePlanOverviewViewModel();
   if (!vm.canView) return <Screen>{header}<Notice tone="info">You do not have access to this business&apos;s plan.</Notice></Screen>;
   if (vm.loading) return <Screen>{header}<LoadingView /></Screen>;
@@ -145,7 +147,7 @@ function PlanOverview({ header, onNewTask, onNewGoal, onOpenTask, onOpenGoal, on
         <TaskRows items={vm.focus} onOpen={onOpenTask} empty="Nothing due. Add a task, or look at what is coming up." />
       </Panel>
 
-      <SuggestionsPanel onAssist={onAssist} onOpenSuggestion={onOpenSuggestion} />
+      <SuggestionsPanel onAssist={onAssist} onOpenSuggestion={onOpenSuggestion} onAskVerida={onAskVerida} />
 
       <Panel style={styles.list}>
         <SectionHeader title="Active goals" />
@@ -233,6 +235,7 @@ function GoalList({ header, onNewGoal, onOpenGoal }: PlanScreenProps & { header:
           {vm.showClosed ? 'Hide finished goals' : 'Show finished goals'}
         </Button>
       </Row>
+      <PendingSyncPanel sync={vm.sync} />
       {vm.loading ? (
         <LoadingView />
       ) : vm.error ? (
@@ -248,10 +251,17 @@ function GoalList({ header, onNewGoal, onOpenGoal }: PlanScreenProps & { header:
   );
 }
 
-type TaskFormProps = { taskId?: string; goalId?: string; onDone: (id: string) => void; onSeriesCreated?: (ruleId: string) => void; onQueued?: () => void };
+type TaskFormProps = {
+  taskId?: string;
+  goalId?: string;
+  prefill?: { title?: string; dueOn?: string };
+  onDone: (id: string) => void;
+  onSeriesCreated?: (ruleId: string) => void;
+  onQueued?: () => void;
+};
 
-export function TaskFormScreen({ taskId, goalId, onDone, onSeriesCreated, onQueued }: TaskFormProps) {
-  const vm = useTaskFormViewModel({ taskId, goalId, onDone, onSeriesCreated, onQueued });
+export function TaskFormScreen({ taskId, goalId, prefill, onDone, onSeriesCreated, onQueued }: TaskFormProps) {
+  const vm = useTaskFormViewModel({ taskId, goalId, prefill, onDone, onSeriesCreated, onQueued });
   if (vm.loading) return <LoadingView />;
   if (vm.loadError) return <ErrorView message={vm.loadError} />;
   const { values, errors, setValue } = vm.form;
@@ -413,6 +423,7 @@ export function TaskProfileScreen({ taskId, onEdit, onOpenGoal, onOpenSeries, on
         </Button>
       ) : null}
       <TaskLinks vm={vm} />
+      <TaskAttachments vm={vm} />
       <TaskReminders vm={vm} />
       <TaskComments vm={vm} />
       <TaskHistory vm={vm} />
@@ -431,6 +442,40 @@ export function TaskProfileScreen({ taskId, onEdit, onOpenGoal, onOpenSeries, on
 }
 
 type TaskDetail = ReturnType<typeof useTaskDetailViewModel>;
+
+// Photos and PDFs on a task, such as a quote or a photo of the broken fence. As private as the task.
+function TaskAttachments({ vm }: { vm: TaskDetail }) {
+  if (!vm.canAttach && vm.attachments.length === 0) return null;
+  return (
+    <Panel style={styles.list}>
+      <SectionHeader title="Attachments" />
+      {vm.attachments.length > 0 ? <AttachmentGallery label="Files on this task" files={vm.attachments.filter((file) => file.url).map((file) => ({ url: file.url, isPdf: file.isPdf }))} /> : null}
+      {vm.attachments.map((file) => (
+        <List.Item
+          key={file.path}
+          title={file.isPdf ? 'PDF document' : 'Photo'}
+          description={file.name}
+          left={(p) => <List.Icon {...p} icon={file.isPdf ? 'file-pdf-box' : 'image-outline'} />}
+          right={() => (vm.canEdit ? <IconButton icon="close" size={18} onPress={() => vm.removeAttachment(file.path)} accessibilityLabel={`Remove ${file.name}`} /> : null)}
+        />
+      ))}
+      {vm.attachments.length === 0 ? <Text style={styles.muted}>No files yet.</Text> : null}
+      {vm.canAttach ? (
+        <Row wrap>
+          <Button compact mode="outlined" icon="camera-outline" onPress={vm.takePhoto} disabled={vm.attaching}>
+            Take photo
+          </Button>
+          <Button compact mode="outlined" icon="image-outline" onPress={vm.choosePhoto} disabled={vm.attaching}>
+            Choose photo
+          </Button>
+          <Button compact mode="outlined" icon="file-pdf-box" onPress={vm.chooseDocument} disabled={vm.attaching} loading={vm.attaching}>
+            Add PDF
+          </Button>
+        </Row>
+      ) : null}
+    </Panel>
+  );
+}
 
 // Section 4.3: the records a task is about. A link names the record and never copies an amount.
 function TaskLinks({ vm }: { vm: TaskDetail }) {
@@ -589,8 +634,8 @@ function TaskHistory({ vm }: { vm: TaskDetail }) {
   );
 }
 
-export function GoalFormScreen({ goalId, onDone }: { goalId?: string; onDone: (id: string) => void }) {
-  const vm = useGoalFormViewModel({ goalId, onDone });
+export function GoalFormScreen({ goalId, onDone, onQueued }: { goalId?: string; onDone: (id: string) => void; onQueued?: () => void }) {
+  const vm = useGoalFormViewModel({ goalId, onDone, onQueued });
   if (vm.loading) return <LoadingView />;
   if (vm.loadError) return <ErrorView message={vm.loadError} />;
   const { values, errors, setValue } = vm.form;
@@ -648,6 +693,7 @@ export function GoalProfileScreen({ goalId, onEdit, onOpenTask, onAddTask, onAss
 
   return (
     <Screen>
+      <PendingSyncPanel sync={vm.sync} />
       <ProfileHeader icon="flag-outline" tone="neutral" title={goal.title} subtitle={goal.targetOn ? `By ${formatDate(goal.targetOn)}` : undefined} status={{ label: vm.statusLabel, tone: GOAL_TONES[goal.status] }} />
       {goal.statusReason ? <Notice title={vm.statusLabel}>{goal.statusReason}</Notice> : null}
 

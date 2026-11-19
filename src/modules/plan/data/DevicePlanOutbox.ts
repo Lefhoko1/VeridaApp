@@ -16,6 +16,32 @@ const taskInputSchema = z.object({
   goalIds: z.array(z.string()),
 });
 
+const goalInputSchema = z.object({
+  title: z.string(),
+  description: z.string().nullable(),
+  goalType: z.enum(['measurable', 'milestone']),
+  direction: z.enum(['increase', 'decrease', 'maintain', 'threshold']).nullable(),
+  unit: z.string().nullable(),
+  baselineValue: z.number().nullable(),
+  targetValue: z.number().nullable(),
+  tolerance: z.number().nullable(),
+  kpiCode: z.string().nullable(),
+  startOn: z.string(),
+  targetOn: z.string().nullable(),
+  status: z.enum(['active', 'on_hold', 'at_risk', 'completed', 'cancelled', 'expired']),
+  statusReason: z.string().nullable(),
+});
+
+const eventInputSchema = z.object({
+  title: z.string(),
+  description: z.string().nullable(),
+  eventType: z.enum(['meeting', 'delivery', 'appointment', 'deadline', 'other']),
+  startsOn: z.string(),
+  startTime: z.string().nullable(),
+  endTime: z.string().nullable(),
+  status: z.enum(['scheduled', 'done', 'cancelled']),
+});
+
 const itemSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('create'), clientId: z.string(), recordedAt: z.string(), input: taskInputSchema, error: z.string().nullable() }),
   z.object({
@@ -28,6 +54,28 @@ const itemSchema = z.discriminatedUnion('kind', [
     base: taskInputSchema,
     input: taskInputSchema,
     conflict: z.boolean(),
+    error: z.string().nullable(),
+  }),
+  z.object({ kind: z.literal('create_goal'), clientId: z.string(), recordedAt: z.string(), input: goalInputSchema, error: z.string().nullable() }),
+  z.object({ kind: z.literal('create_event'), clientId: z.string(), recordedAt: z.string(), input: eventInputSchema, error: z.string().nullable() }),
+  z.object({
+    kind: z.literal('create_milestone'),
+    clientId: z.string(),
+    recordedAt: z.string(),
+    goalId: z.string(),
+    goalTitle: z.string(),
+    title: z.string(),
+    dueOn: z.string().nullable(),
+    sortOrder: z.number(),
+    error: z.string().nullable(),
+  }),
+  z.object({
+    kind: z.literal('set_milestone'),
+    clientId: z.string(),
+    recordedAt: z.string(),
+    milestoneId: z.string(),
+    title: z.string(),
+    status: z.enum(['pending', 'completed']),
     error: z.string().nullable(),
   }),
 ]);

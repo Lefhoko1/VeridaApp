@@ -30,7 +30,9 @@ type LocalMessage = ChatMessage & {
   missingFields?: string[];
 };
 
-export function useAskViewModel(initialConversationId?: string) {
+// A question handed over from elsewhere, such as a Plan suggestion, waits in the box for the
+// person to read and send. It is never sent on their behalf.
+export function useAskViewModel(initialConversationId?: string, suggestedQuestion?: string) {
   const { conversations, gateway, businessFacts } = useAssistantDependencies();
   const { business, industry } = useActiveBusiness();
   const feedback = useFeedback();
@@ -38,7 +40,13 @@ export function useAskViewModel(initialConversationId?: string) {
   const scope = [...businessScope(business.id), 'assistant'];
 
   const [conversationId, setConversationId] = useState(initialConversationId ?? null);
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState(suggestedQuestion ?? '');
+  // A new question handed over while the screen is already open replaces the draft.
+  const [handedOver, setHandedOver] = useState(suggestedQuestion);
+  if (suggestedQuestion && suggestedQuestion !== handedOver) {
+    setHandedOver(suggestedQuestion);
+    setDraft(suggestedQuestion);
+  }
   const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [usedRules, setUsedRules] = useState(false);
 

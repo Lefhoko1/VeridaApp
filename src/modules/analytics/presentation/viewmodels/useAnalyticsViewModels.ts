@@ -155,6 +155,8 @@ export function useInsightsViewModel() {
     periodControl,
     period,
     insights,
+    // Plan journey 5.3: someone who works on tasks can turn an insight into planned actions.
+    canPlan: can('plan.tasks'),
     chart: (series.data ?? []).map((point) => ({
       key: point.month,
       label: formatMonth(point.month),

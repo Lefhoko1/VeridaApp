@@ -1,5 +1,16 @@
+import { router } from 'expo-router';
+
 import { InsightsScreen } from '@/modules/analytics';
 
 export default function InsightsRoute() {
-  return <InsightsScreen />;
+  return (
+    <InsightsScreen
+      onPlanAction={(insight) =>
+        router.push({
+          pathname: '/assist',
+          params: { insightTitle: insight.title, insightBody: insight.body, insightEvidence: insight.evidence, insightKpi: insight.kpiCode ?? '' },
+        })
+      }
+    />
+  );
 }

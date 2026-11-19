@@ -21,7 +21,7 @@ import {
   supporting,
 } from '@/design-system';
 
-import type { SuggestionKind } from '../../domain/assist';
+import type { FocusInsight, SuggestionKind } from '../../domain/assist';
 import { usePlanAssistViewModel, usePlanSettingsViewModel, useSuggestionViewModel, useSuggestionsPanelViewModel } from '../viewmodels/useAssistViewModels';
 import type { PlanSync } from '../viewmodels/usePlanSync';
 import { partStyles } from './planParts';
@@ -29,7 +29,9 @@ import { partStyles } from './planParts';
 // ---------------------------------------------------------------------------------------------
 // Section 1 wireframe: "A suggestion from Verida", kept apart from confirmed work and labelled.
 
-export function SuggestionsPanel({ onAssist, onOpenSuggestion }: { onAssist: () => void; onOpenSuggestion: (id: string) => void }) {
+type PanelProps = { onAssist: () => void; onOpenSuggestion: (id: string) => void; onAskVerida: (question: string) => void };
+
+export function SuggestionsPanel({ onAssist, onOpenSuggestion, onAskVerida }: PanelProps) {
   const vm = useSuggestionsPanelViewModel();
   if (!vm.canAsk && !vm.hasAny) return null;
   const top = vm.top;
@@ -61,6 +63,9 @@ export function SuggestionsPanel({ onAssist, onOpenSuggestion }: { onAssist: () 
             ) : null}
             <Button compact mode="outlined" onPress={() => vm.dismiss(top.action.id)} disabled={vm.busy}>
               Dismiss
+            </Button>
+            <Button compact icon="creation-outline" onPress={() => onAskVerida(top.askQuestion)}>
+              Ask Verida
             </Button>
             <Button compact onPress={() => onOpenSuggestion(top.suggestionId)}>
               {top.remaining > 1 ? `See all ${top.remaining}` : 'Details'}
@@ -118,14 +123,19 @@ export function PendingSyncPanel({ sync }: { sync: PlanSync }) {
 // ---------------------------------------------------------------------------------------------
 // Section 4.6 and journeys 5.2 and 5.3: asking Verida for help.
 
-export function PlanAssistScreen({ kind, goalId, onDone }: { kind?: SuggestionKind; goalId?: string; onDone: (suggestionId: string) => void }) {
-  const vm = usePlanAssistViewModel({ kind, goalId, onDone });
+type AssistProps = { kind?: SuggestionKind; goalId?: string; insight?: FocusInsight; onDone: (suggestionId: string) => void };
+
+export function PlanAssistScreen({ kind, goalId, insight, onDone }: AssistProps) {
+  const vm = usePlanAssistViewModel({ kind, goalId, insight, onDone });
   if (!vm.canAsk) return <Screen><Notice tone="info">You need permission to work on tasks to ask Verida for a plan.</Notice></Screen>;
   return (
     <Screen variant="form">
       <Notice tone="info">Verida drafts suggestions from your goals, tasks, schedule and figures. Nothing is added to your plan until you accept it.</Notice>
       <Panel>
         <SelectField label="What would you like?" value={vm.kind} options={vm.kindOptions} onChange={vm.setKind} />
+        {vm.insight ? (
+          <Notice title="From your insight">{`${vm.insight.title}${vm.insight.evidence ? ` (based on: ${vm.insight.evidence})` : ''}`}</Notice>
+        ) : null}
         {vm.kind === 'goal_breakdown' ? <SelectField label="Goal" value={vm.goal} options={vm.goalOptions} onChange={vm.setGoal} hint={vm.goalOptions.length === 0 ? 'Create a goal first.' : undefined} /> : null}
         <FormField label={vm.requestLabel} value={vm.request} onChangeText={vm.setRequest} multiline hint={vm.kind === 'weekly_plan' ? 'For example: free mornings, market on Saturday.' : undefined} />
       </Panel>
@@ -139,13 +149,14 @@ export function PlanAssistScreen({ kind, goalId, onDone }: { kind?: SuggestionKi
 
 type SuggestionProps = {
   suggestionId: string;
+  onAskVerida: (question: string) => void;
   onReplaced: (id: string) => void;
   onOpenTask: (id: string) => void;
   onOpenGoal: (id: string) => void;
   onOpenEvent: (id: string) => void;
 };
 
-export function SuggestionScreen({ suggestionId, onReplaced, onOpenTask, onOpenGoal, onOpenEvent }: SuggestionProps) {
+export function SuggestionScreen({ suggestionId, onReplaced, onOpenTask, onOpenGoal, onOpenEvent, onAskVerida }: SuggestionProps) {
   const vm = useSuggestionViewModel(suggestionId, { onReplaced });
   if (vm.loading) return <LoadingView />;
   if (vm.error || !vm.suggestion) return <ErrorView message={vm.error ?? 'This suggestion could not be found.'} />;
@@ -159,6 +170,7 @@ export function SuggestionScreen({ suggestionId, onReplaced, onOpenTask, onOpenG
       {vm.statusNote ? <Notice title="No longer open">{vm.statusNote}</Notice> : null}
       <Panel>
         <Text>{s.explanation}</Text>
+        {vm.insightTitle ? <Text style={partStyles.muted}>{`From your insight: ${vm.insightTitle}`}</Text> : null}
         {s.request ? <Text style={partStyles.muted}>{`You asked: ${s.request}`}</Text> : null}
         {vm.period ? <Text style={partStyles.muted}>{`Period: ${vm.period}`}</Text> : null}
         {s.assumptions ? <Text style={partStyles.muted}>{`Assumptions: ${s.assumptions}`}</Text> : null}
@@ -251,6 +263,9 @@ export function SuggestionScreen({ suggestionId, onReplaced, onOpenTask, onOpenG
       ) : null}
 
       <Row wrap>
+        <Button mode="outlined" icon="creation-outline" onPress={() => onAskVerida(vm.askQuestion)}>
+          Ask Verida about this
+        </Button>
         {vm.canRegenerate ? (
           <Button mode="outlined" icon="refresh" onPress={vm.regenerate} loading={vm.regenerating} disabled={vm.regenerating}>
             Ask again

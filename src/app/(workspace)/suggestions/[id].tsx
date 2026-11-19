@@ -11,6 +11,7 @@ export default function SuggestionRoute() {
       onOpenTask={(task) => router.push({ pathname: '/tasks/[id]', params: { id: task } })}
       onOpenGoal={(goal) => router.push({ pathname: '/goals/[id]', params: { id: goal } })}
       onOpenEvent={(event) => router.push({ pathname: '/events/[id]', params: { id: event } })}
+      onAskVerida={(q) => router.navigate({ pathname: '/ask', params: { q } })}
     />
   );
 }

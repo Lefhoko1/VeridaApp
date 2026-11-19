@@ -33,6 +33,8 @@ export type Task = {
   // Set when the task is one occurrence of a repeating series.
   ruleId: string | null;
   occurrenceOn: string | null;
+  // Photos and PDFs attached to the task.
+  attachmentPaths: string[];
 };
 
 export type TaskInput = {

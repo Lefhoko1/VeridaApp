@@ -10,16 +10,18 @@ const CAPTURE_LABEL: Record<CaptureTarget, string> = {
   sale: 'Open the sale form',
   expense: 'Open the expense form',
   activity: 'Open the activity form',
+  task: 'Open the task form',
 };
 
 type AskScreenProps = {
   conversationId?: string;
   onCapture: (target: CaptureTarget, prefill: Record<string, string>) => void;
   onOpenHistory?: () => void;
+  suggestedQuestion?: string;
 };
 
-export function AskScreen({ conversationId, onCapture, onOpenHistory }: AskScreenProps) {
-  const vm = useAskViewModel(conversationId);
+export function AskScreen({ conversationId, onCapture, onOpenHistory, suggestedQuestion }: AskScreenProps) {
+  const vm = useAskViewModel(conversationId, suggestedQuestion);
 
   if (vm.loadingHistory) return <LoadingView />;
 

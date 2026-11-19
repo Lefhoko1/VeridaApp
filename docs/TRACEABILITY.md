@@ -97,7 +97,15 @@ Notes on phase 4b:
 - Offline (section 8): creating a task or changing its status without a connection keeps the change on the device, in its secure store, for that person and business only. It is sent when the connection returns, on opening Plan, when the app comes back to the front and every 30 seconds. A client id makes a resent create one task, and the task keeps the time it was captured. A change to a task someone else changed meanwhile is never applied silently: the person keeps theirs or the other version, and keeping theirs applies only the fields they changed, so a completion is never lost. Goals, milestones and events still need a connection.
 - Plan settings (section 13): whether team members can be given tasks (owners always can), built-in suggestions every Monday, and the time for reminders on the due day. Only the owner changes them.
 - Section 13's open decisions are now settings or were taken as: staff assignment on by default; AI suggestions on request, built-in ones weekly if the owner chooses; in-app and email reminders; goals belong to one business; the completion rate uses the current due date; task attachments deferred, as receipts on records already cover evidence.
-- Not covered: links to customers and suppliers, which have no records yet; project dependencies, capacity planning, external calendars and workflow automation, which the specification lists for later.
+- Not covered: links to customers and suppliers, which have no records yet; push notifications, which need a development build; project dependencies, capacity planning, external calendars and workflow automation, which the specification lists for later.
+
+Closing the remaining gaps:
+
+- Journey 5.3: every insight with something to act on has Plan an action, which opens Plan with Verida about that insight. The suggestion remembers the insight, and a task accepted from it is linked to the insight's measure. Without the AI, the built-in rules start with "Look into" the insight.
+- Journey 5.1: Ask Verida can open the task form with the title and due date the person gave, as it does for sales, expenses and activities. Nothing is saved until they confirm. Its built-in rules recognise "remind me to", "add a task" and "task:".
+- Section 1 wireframe: a suggestion has Ask Verida, which opens Ask Verida with a question about it, ready to send. The question names the suggestion and its reason, never people.
+- Section 8: creating goals, milestones and events, and ticking milestones, also wait on the device without a connection. Each create carries a client id, so a resent one is made once.
+- Open decision 6: tasks can hold up to ten photos or PDFs, stored in the business's private plan folder. Anyone who can see the plan can see them; those who work on tasks add and remove them.
 
 Notes on phase 4a:
 

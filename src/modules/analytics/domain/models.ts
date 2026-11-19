@@ -38,4 +38,6 @@ export type Insight = {
   body: string;
   // FR-E23: the data and reporting period behind the insight.
   evidence: string;
+  // The measure it is about, if any, so an action planned from it can link back (Plan journey 5.3).
+  kpiCode: string | null;
 };

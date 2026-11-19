@@ -6,13 +6,13 @@ import { assertSuccess, nullableNumeric, numeric, parseOptionalRow, parseRow, pa
 
 import type { Goal, GoalInput, GoalProgress, KpiOption, Milestone, PlanOverview, ProgressEntry, ProgressObservation, Task, TaskInput } from '../domain/models';
 import type { PlanRepository } from '../domain/repositories';
-import type { ActionEdits, GoalMeasure, LinkTarget, PlanSettings, Suggestion, SuggestionKind, TaskLink } from '../domain/assist';
+import type { ActionEdits, FocusInsight, GoalMeasure, LinkTarget, PlanSettings, Suggestion, SuggestionKind, TaskLink } from '../domain/assist';
 import type { EventInput, EventRuleInput, PlanEvent, PlanReview, RecurringRule, Reminder, ReviewInput, RuleInput, RuleUpdate, ScheduleItem, TaskComment, TaskHistoryEntry } from '../domain/schedule';
 
 const LIST_LIMIT = 500;
 
 const TASK_COLUMNS =
-  'id, title, description, priority, status, due_on, completed_at, completed_on, completion_note, blocker_reason, assigned_to, version, created_at, rule_id, occurrence_on';
+  'id, title, description, priority, status, due_on, completed_at, completed_on, completion_note, blocker_reason, assigned_to, version, created_at, rule_id, occurrence_on, attachment_paths';
 
 const PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const;
 const TASK_STATUSES = ['not_started', 'in_progress', 'blocked', 'completed', 'cancelled'] as const;
@@ -39,6 +39,7 @@ const taskSchema = z.object({
   created_at: z.string(),
   rule_id: z.string().nullable(),
   occurrence_on: z.string().nullable(),
+  attachment_paths: z.array(z.string()).nullable().catch([]),
 });
 
 const toTask = (row: z.output<typeof taskSchema>, goalIds: string[]): Task => ({
@@ -58,6 +59,7 @@ const toTask = (row: z.output<typeof taskSchema>, goalIds: string[]): Task => ({
   completedOn: row.completed_on,
   ruleId: row.rule_id,
   occurrenceOn: row.occurrence_on,
+  attachmentPaths: row.attachment_paths ?? [],
 });
 
 const toTaskRow = (input: TaskInput) => ({
@@ -393,7 +395,8 @@ const actionSchema = z
     } as Suggestion['actions'][number],
   }));
 
-const SUGGESTION_COLUMNS = 'id, kind, goal_id, request, title, explanation, assumptions, limitations, sources, period_start, period_end, generator, model, status, generated_at';
+const SUGGESTION_COLUMNS =
+  'id, kind, goal_id, request, title, explanation, assumptions, limitations, sources, period_start, period_end, generator, model, status, generated_at, insight_kpi, insight_title';
 const ACTION_COLUMNS =
   'id, recommendation_id, action_type, proposed_payload, final_payload, why, approval_status, created_task_id, created_goal_id, created_event_id, created_milestone_id, decided_at, sort_order';
 
@@ -414,6 +417,8 @@ const suggestionSchema = z
     model: z.string().nullable(),
     status: z.enum(['open', 'decided', 'dismissed', 'superseded']),
     generated_at: z.string(),
+    insight_kpi: z.string().nullable(),
+    insight_title: z.string().nullable(),
   })
   .transform(
     (row): Suggestion => ({
@@ -432,6 +437,8 @@ const suggestionSchema = z
       model: row.model,
       status: row.status,
       generatedAt: row.generated_at,
+      insightKpi: row.insight_kpi,
+      insightTitle: row.insight_title,
       actions: [],
     }),
   );
@@ -542,8 +549,17 @@ export class SupabasePlanRepository implements PlanRepository {
     return row;
   }
 
-  async createGoal(businessId: string, input: GoalInput): Promise<string> {
-    return parseRow(idSchema, await this.db.from('goals').insert({ business_id: businessId, goal_type: input.goalType, ...toGoalRow(input) }).select('id').single()).id;
+  // Section 8: resending a goal captured offline finds the one already made.
+  private async createOnce(table: 'goals' | 'events' | 'goal_milestones', row: Record<string, unknown>, clientId: string | undefined): Promise<string> {
+    const response = await this.db.from(table).insert(clientId ? { ...row, client_id: clientId } : row).select('id').single();
+    if (clientId && response.error?.code === '23505') {
+      return parseRow(idSchema, await this.db.from(table).select('id').eq('client_id', clientId).single()).id;
+    }
+    return parseRow(idSchema, response).id;
+  }
+
+  async createGoal(businessId: string, input: GoalInput, offline?: { clientId: string }): Promise<string> {
+    return this.createOnce('goals', { business_id: businessId, goal_type: input.goalType, ...toGoalRow(input) }, offline?.clientId);
   }
 
   async updateGoal(id: string, input: GoalInput): Promise<void> {
@@ -576,8 +592,8 @@ export class SupabasePlanRepository implements PlanRepository {
     );
   }
 
-  async addMilestone(businessId: string, goalId: string, input: { title: string; dueOn: string | null; sortOrder: number }): Promise<void> {
-    assertSuccess(await this.db.from('goal_milestones').insert({ business_id: businessId, goal_id: goalId, title: input.title, due_on: input.dueOn, sort_order: input.sortOrder }));
+  async addMilestone(businessId: string, goalId: string, input: { title: string; dueOn: string | null; sortOrder: number; clientId?: string }): Promise<void> {
+    await this.createOnce('goal_milestones', { business_id: businessId, goal_id: goalId, title: input.title, due_on: input.dueOn, sort_order: input.sortOrder }, input.clientId);
   }
 
   async setMilestoneStatus(id: string, status: Milestone['status']): Promise<void> {
@@ -668,8 +684,8 @@ export class SupabasePlanRepository implements PlanRepository {
     return parseRow(eventSchema, await this.db.from('events').select(EVENT_COLUMNS).eq('id', id).single());
   }
 
-  async createEvent(businessId: string, input: EventInput): Promise<string> {
-    return parseRow(idSchema, await this.db.from('events').insert({ business_id: businessId, ...toEventRow(input) }).select('id').single()).id;
+  async createEvent(businessId: string, input: EventInput, offline?: { clientId: string }): Promise<string> {
+    return this.createOnce('events', { business_id: businessId, ...toEventRow(input) }, offline?.clientId);
   }
 
   async updateEvent(id: string, input: EventInput): Promise<void> {
@@ -758,8 +774,14 @@ export class SupabasePlanRepository implements PlanRepository {
     return row;
   }
 
-  async suggestFromRules(businessId: string, kind: SuggestionKind, goalId: string | null, request: string | null): Promise<string | null> {
-    const response = await this.db.rpc('suggest_from_rules', { p_business_id: businessId, p_kind: kind, p_goal_id: goalId, p_request: request });
+  async suggestFromRules(businessId: string, kind: SuggestionKind, goalId: string | null, request: string | null, insight?: FocusInsight | null): Promise<string | null> {
+    const response = await this.db.rpc('suggest_from_rules', {
+      p_business_id: businessId,
+      p_kind: kind,
+      p_goal_id: goalId,
+      p_request: request,
+      p_insight: insight ? { kpi_code: insight.kpiCode, title: insight.title } : null,
+    });
     assertSuccess(response);
     return typeof response.data === 'string' ? response.data : null;
   }
@@ -806,6 +828,10 @@ export class SupabasePlanRepository implements PlanRepository {
         p_default_reminder_time: settings.defaultReminderTime,
       }),
     );
+  }
+
+  async setTaskAttachments(taskId: string, paths: string[]): Promise<void> {
+    assertSuccess(await this.db.from('tasks').update({ attachment_paths: paths }).eq('id', taskId));
   }
 
   async listTaskLinks(taskId: string): Promise<TaskLink[]> {

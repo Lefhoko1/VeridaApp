@@ -111,7 +111,7 @@ export function createAppDependencies(client: SupabaseClient) {
     assistant: createAssistantDependencies(client, createBusinessFactsProvider(analytics.analytics)),
     notifications: createNotificationsDependencies(client),
     administration: createAdministrationDependencies(client),
-    plan: createPlanDependencies(client, createPlanLinkSource(records, operations)),
+    plan: createPlanDependencies(client, createPlanLinkSource(records, operations), files),
   };
 }
 

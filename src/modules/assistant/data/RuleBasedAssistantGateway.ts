@@ -14,7 +14,22 @@ const CAPTURE_GUIDES: Record<CaptureTarget, { fields: string; missing: string }>
     fields: 'the date, what you are recording and how much. For example, eggs collected or stock received.',
     missing: 'You will need the count or quantity for that day.',
   },
+  task: {
+    fields: 'what needs doing, and if you like a due date, a priority and who does it.',
+    missing: 'Only the title is required.',
+  },
 };
+
+// Plan section 5.1: "remind me to order feed on Friday" becomes a task form titled "Order feed on Friday".
+const TASK_PHRASES = ['remind me to ', 'add a task to ', 'add a task: ', 'new task: ', 'task: ', 'todo: ', 'to-do: '];
+
+function detectTask(original: string): { title: string } | null {
+  const lower = original.toLowerCase();
+  const phrase = TASK_PHRASES.find((candidate) => lower.includes(candidate));
+  if (!phrase) return null;
+  const title = original.slice(lower.indexOf(phrase) + phrase.length).trim().replace(/[.!?]+$/, '');
+  return title ? { title: (title.charAt(0).toUpperCase() + title.slice(1)).slice(0, 160) } : null;
+}
 
 const fact = (context: AssistantContext, code: string): BusinessFact | undefined =>
   context.facts.find((item) => item.code === code);
@@ -58,6 +73,17 @@ function explainFact(item: BusinessFact, context: AssistantContext): RuleAnswer 
 
 export function answerQuestion(rawQuestion: string, context: AssistantContext): RuleAnswer {
   const question = rawQuestion.toLowerCase();
+
+  const task = detectTask(rawQuestion);
+  if (task) {
+    return {
+      text: `I can open a task form for "${task.title}". You can add a due date, a priority and who does it, and nothing is saved until you confirm it.`,
+      confidence: 'guidance',
+      intent: 'capture:task',
+      suggestedCapture: 'task',
+      capturePrefill: { title: task.title },
+    };
+  }
 
   const capture = detectCapture(question);
   if (capture) {

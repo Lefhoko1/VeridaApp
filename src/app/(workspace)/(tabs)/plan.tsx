@@ -16,6 +16,7 @@ export default function PlanRoute() {
       onAssist={() => router.push('/assist')}
       onOpenSuggestion={(id) => router.push({ pathname: '/suggestions/[id]', params: { id } })}
       onOpenSettings={() => router.push('/plan-settings')}
+      onAskVerida={(q) => router.navigate({ pathname: '/ask', params: { q } })}
     />
   );
 }

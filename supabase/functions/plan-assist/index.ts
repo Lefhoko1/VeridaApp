@@ -38,6 +38,16 @@ Deno.serve(async (req) => {
   const kind = (PLAN_KINDS as readonly string[]).includes(body.kind) ? (body.kind as PlanKind) : null;
   const goalId = typeof body.goalId === 'string' ? body.goalId : null;
   const request = typeof body.request === 'string' ? body.request.trim().slice(0, MAX_REQUEST_LENGTH) : null;
+  // Journey 5.3: the insight this was asked from, as text the person saw. Treated as data.
+  const insight =
+    body.insight && typeof body.insight.title === 'string'
+      ? {
+          kpiCode: typeof body.insight.kpiCode === 'string' ? body.insight.kpiCode.slice(0, 80) : null,
+          title: body.insight.title.slice(0, 160),
+          body: typeof body.insight.body === 'string' ? body.insight.body.slice(0, 600) : '',
+          evidence: typeof body.insight.evidence === 'string' ? body.insight.evidence.slice(0, 300) : '',
+        }
+      : null;
   if (!businessId || !kind || (kind === 'goal_breakdown' && !goalId) || (kind === 'request' && !request)) {
     return json({ error: 'invalid_request' }, 400);
   }
@@ -129,7 +139,7 @@ Deno.serve(async (req) => {
 
     const suggestion = await askClaude({
       system: PLAN_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: buildPlanRequest(context, kind, { request, focusGoalId: goalId }) }],
+      messages: [{ role: 'user', content: buildPlanRequest(context, kind, { request, focusGoalId: goalId, focusInsight: insight }) }],
       schema: planSuggestionSchema,
       effort: 'medium',
     });
@@ -153,6 +163,7 @@ Deno.serve(async (req) => {
       p_generator: 'ai',
       p_model: aiModel(),
       p_actions: toStoredActions(suggestion),
+      p_insight: insight ? { kpi_code: insight.kpiCode, title: insight.title } : null,
     });
     // The database refused something the model proposed: treat it as unavailable, so the app
     // offers the built-in suggestions instead.

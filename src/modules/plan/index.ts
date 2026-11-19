@@ -1,3 +1,4 @@
+import type { BusinessFileStore } from '@/core/files/types';
 import { deviceStore } from '@/core/storage/keyValueStore';
 import type { SupabaseClient } from '@/core/supabase/client';
 
@@ -7,12 +8,12 @@ import { SupabasePlanRepository } from './data/SupabasePlanRepository';
 import type { PlanLinkSource } from './domain/assist';
 import type { PlanDependencies } from './presentation/di';
 
-export function createPlanDependencies(client: SupabaseClient, links: PlanLinkSource): PlanDependencies {
+export function createPlanDependencies(client: SupabaseClient, links: PlanLinkSource, files: BusinessFileStore): PlanDependencies {
   const plan = new SupabasePlanRepository(client);
-  return { plan, advisor: new EdgePlanAdvisor(client, plan), outbox: new DevicePlanOutbox(deviceStore), links };
+  return { plan, advisor: new EdgePlanAdvisor(client, plan), outbox: new DevicePlanOutbox(deviceStore), links, files };
 }
 
-export type { LinkOption, PlanLinkSource } from './domain/assist';
+export type { FocusInsight, LinkOption, PlanLinkSource } from './domain/assist';
 export { PlanDependenciesProvider } from './presentation/di';
 export { GoalFormScreen, GoalProfileScreen, PlanScreen, TaskFormScreen, TaskProfileScreen } from './presentation/views/planScreens';
 export { EventFormScreen, EventProfileScreen, ReviewFormScreen, ReviewScreen, SeriesFormScreen, SeriesProfileScreen } from './presentation/views/scheduleScreens';

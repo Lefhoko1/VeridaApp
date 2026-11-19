@@ -10,7 +10,7 @@ const answerSchema = z.object({
   text: z.string().min(1),
   confidence: z.enum(['verified', 'estimate', 'guidance', 'insufficient_data']),
   intent: z.string(),
-  suggestedCapture: z.enum(['sale', 'expense', 'activity']).nullable(),
+  suggestedCapture: z.enum(['sale', 'expense', 'activity', 'task']).nullable(),
   capturePrefill: z.record(z.string(), z.string()),
   missingFields: z.array(z.string()),
 });

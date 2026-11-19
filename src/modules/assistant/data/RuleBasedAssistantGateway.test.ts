@@ -79,3 +79,16 @@ describe('Ask Verida rules', () => {
     expect(answer.text).not.toContain('P100.00');
   });
 });
+
+describe('Ask Verida and the Plan task form (Plan journey 5.1)', () => {
+  it('opens a task form titled from what the person asked to be reminded of', () => {
+    const answer = answerQuestion('Remind me to order feed on Friday.', context([]));
+    expect(answer).toMatchObject({ suggestedCapture: 'task', intent: 'capture:task', capturePrefill: { title: 'Order feed on Friday' } });
+    expect(answer.text).toContain('nothing is saved until you confirm');
+  });
+
+  it('does not mistake an ordinary question for a task', () => {
+    expect(answerQuestion('I need to know my profit', context([fact('recorded_balance')])).suggestedCapture).not.toBe('task');
+    expect(answerQuestion('What tasks help a poultry farm?', context([])).suggestedCapture).toBeNull();
+  });
+});

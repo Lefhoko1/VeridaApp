@@ -9,7 +9,7 @@ export const answerSchema = z.object({
   intent: z.string(),
   capture: z
     .object({
-      target: z.enum(['sale', 'expense', 'activity']),
+      target: z.enum(['sale', 'expense', 'activity', 'task']),
       item_or_description: z.string().nullable(),
       category: z.string().nullable(),
       activity_name: z.string().nullable(),
@@ -40,7 +40,9 @@ Never present an unsupported conclusion as fact. If the records show something b
 
 Set "relates_to_business" to false for questions unrelated to running a business, and in that case say briefly and politely what you can help with instead. Business concepts count as related, so explain them clearly and connect them to the user's own type of business when that helps them learn.
 
-When the user wants to record a sale, expense or activity, or wants to know how, set "capture". Explain what the fields are for, fill in only values the user actually stated, leave the others null, and list in "missing_fields" the plain-English names of the required information they have not given. Required for a sale: item or service, quantity, unit price. Required for an expense: category, description, amount. Required for an activity: activity name, quantity. Dates use YYYY-MM-DD, and numbers contain only digits and a decimal point. Tell the user that they will review the details in a form and nothing is saved until they confirm. You cannot save records yourself. Use null for "capture" otherwise.
+When the user wants to record a sale, expense or activity, or wants to know how, set "capture". Explain what the fields are for, fill in only values the user actually stated, leave the others null, and list in "missing_fields" the plain-English names of the required information they have not given. Required for a sale: item or service, quantity, unit price. Required for an expense: category, description, amount. Required for an activity: activity name, quantity. Dates use YYYY-MM-DD, and numbers contain only digits and a decimal point. Tell the user that they will review the details in a form and nothing is saved until they confirm. You cannot save records yourself.
+
+When the user wants to plan something to do, or asks to be reminded to do something, set "capture" with target "task": put a short task title in "item_or_description" and the due date, if they gave one, in "occurred_on". A task needs only a title. Use null for "capture" otherwise.
 
 "intent" is a short label such as "kpi:revenue", "concept:profit", "capture:sale" or "off_topic".
 
@@ -105,7 +107,16 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 export function toClientAnswer(parsed: ParsedAnswer) {
   const capture = parsed.capture;
   const number = (value: string | null) => (value && REQUIRED_NUMBER.test(value) ? value : undefined);
-  const prefill = capture
+  // Plan section 5.1: a task opens the task form with its title and due date.
+  const taskPrefill = capture?.target === 'task'
+    ? Object.fromEntries(
+        Object.entries({
+          title: capture.item_or_description?.slice(0, 160) ?? undefined,
+          dueOn: capture.occurred_on && ISO_DATE.test(capture.occurred_on) ? capture.occurred_on : undefined,
+        }).filter(([, value]) => value !== undefined),
+      )
+    : null;
+  const prefill = taskPrefill ?? (capture
     ? Object.fromEntries(
         Object.entries({
           description: capture.item_or_description ?? undefined,
@@ -118,7 +129,7 @@ export function toClientAnswer(parsed: ParsedAnswer) {
           occurredOn: capture.occurred_on && ISO_DATE.test(capture.occurred_on) ? capture.occurred_on : undefined,
         }).filter(([, value]) => value !== undefined),
       )
-    : {};
+    : {});
   return {
     text: parsed.text,
     confidence: parsed.confidence,

@@ -42,6 +42,7 @@ import {
   useSeriesFormViewModel,
   type ScheduleRow,
 } from '../viewmodels/useScheduleViewModels';
+import { PendingSyncPanel } from './assistScreens';
 import { GoalCards, PRIORITY_TONES, TaskRows, partStyles } from './planParts';
 
 const EVENT_TONES: Record<EventStatus, StatusTone> = { scheduled: 'neutral', done: 'ok', cancelled: 'neutral' };
@@ -114,6 +115,7 @@ export function ScheduleSection({ header, onNewTask, onNewEvent, onOpenTask, onO
           </Button>
         </Row>
       ) : null}
+      <PendingSyncPanel sync={vm.sync} />
       <SegmentedButtons value={vm.view} onValueChange={vm.setView} buttons={vm.views} density="small" />
       <Row>
         <IconButton icon="chevron-left" onPress={vm.previous} accessibilityLabel="Earlier" />
@@ -238,10 +240,10 @@ export function ProgressSection({ header, onOpenGoal, onOpenReview }: SectionPro
 // ---------------------------------------------------------------------------------------------
 // Events.
 
-type EventFormProps = { eventId?: string; onDate?: string; onDone: (id: string) => void; onSeriesCreated?: (ruleId: string) => void };
+type EventFormProps = { eventId?: string; onDate?: string; onDone: (id: string) => void; onSeriesCreated?: (ruleId: string) => void; onQueued?: () => void };
 
-export function EventFormScreen({ eventId, onDate, onDone, onSeriesCreated }: EventFormProps) {
-  const vm = useEventFormViewModel({ eventId, onDate, onDone, onSeriesCreated });
+export function EventFormScreen({ eventId, onDate, onDone, onSeriesCreated, onQueued }: EventFormProps) {
+  const vm = useEventFormViewModel({ eventId, onDate, onDone, onSeriesCreated, onQueued });
   if (vm.loading) return <LoadingView />;
   if (vm.loadError) return <ErrorView message={vm.loadError} />;
   const { values, errors, setValue } = vm.form;

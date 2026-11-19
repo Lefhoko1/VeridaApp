@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useOnForeground } from '@/core/app/useOnForeground';
 import { AppError, errorMessage } from '@/core/errors/AppError';
@@ -7,10 +7,15 @@ import { businessScope } from '@/core/query/queryClient';
 import { useActiveBusiness } from '@/modules/business';
 
 import { describeOutboxItem, mergeOntoLatest, type OutboxItem } from '../../domain/assist';
-import type { Task, TaskInput } from '../../domain/models';
+import type { GoalInput, Milestone, Task, TaskInput } from '../../domain/models';
+import type { EventInput } from '../../domain/schedule';
 import { usePlanDependencies } from '../di';
 
 const RETRY_MS = 30_000;
+
+// One sync at a time across the whole app. Several screens use this hook at once (the Plan tab
+// stays open behind a task), and two sending the same change together would report a false conflict.
+let flushing = false;
 
 const toInput = (task: Task): TaskInput => ({
   title: task.title,
@@ -48,7 +53,6 @@ export function usePlanSync() {
   const items = useQuery({ queryKey: key, queryFn: () => (scope ? outbox.list(scope) : Promise.resolve([] as OutboxItem[])), enabled: Boolean(scope) });
   const [offline, setOffline] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const running = useRef(false);
   const scopeKey = scope ? `${scope.userId}.${scope.businessId}` : '';
 
   const refresh = useCallback(async (synced: boolean) => {
@@ -59,16 +63,35 @@ export function usePlanSync() {
   }, [queryClient, scopeKey, business.id]);
 
   const flush = useCallback(async () => {
-    if (!scope || running.current) return;
-    running.current = true;
+    if (!scope || flushing) return;
+    flushing = true;
     setSyncing(true);
     let synced = false;
     try {
       for (const item of await outbox.list(scope)) {
         if (item.kind === 'update' && item.conflict) continue;
         try {
-          if (item.kind === 'create') await plan.createTask(scope.businessId, item.input, { clientId: item.clientId, recordedAt: item.recordedAt });
-          else await plan.updateTask(scope.businessId, item.taskId, item.input, item.expectedVersion);
+          switch (item.kind) {
+            case 'create':
+              await plan.createTask(scope.businessId, item.input, { clientId: item.clientId, recordedAt: item.recordedAt });
+              break;
+            case 'update':
+              await plan.updateTask(scope.businessId, item.taskId, item.input, item.expectedVersion);
+              break;
+            case 'create_goal':
+              await plan.createGoal(scope.businessId, item.input, { clientId: item.clientId });
+              break;
+            case 'create_event':
+              await plan.createEvent(scope.businessId, item.input, { clientId: item.clientId });
+              break;
+            case 'create_milestone':
+              await plan.addMilestone(scope.businessId, item.goalId, { title: item.title, dueOn: item.dueOn, sortOrder: item.sortOrder, clientId: item.clientId });
+              break;
+            case 'set_milestone':
+              // Ticking a milestone is the same whichever device says it last.
+              await plan.setMilestoneStatus(item.milestoneId, item.status);
+              break;
+          }
           await outbox.remove(scope, item.clientId);
           synced = true;
         } catch (error) {
@@ -85,7 +108,7 @@ export function usePlanSync() {
       }
       setOffline(false);
     } finally {
-      running.current = false;
+      flushing = false;
       setSyncing(false);
       await refresh(synced);
     }
@@ -95,9 +118,12 @@ export function usePlanSync() {
 
   // Sends waiting changes on opening, when the app comes back to the front, and every 30 seconds.
   useEffect(() => {
-    void flush();
+    const first = setTimeout(() => void flush(), 0);
     const timer = setInterval(() => void flush(), RETRY_MS);
-    return () => clearInterval(timer);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+    };
   }, [flush]);
   useOnForeground(useCallback(() => void flush(), [flush]));
 
@@ -126,6 +152,30 @@ export function usePlanSync() {
         conflict: false,
         error: null,
       });
+      setOffline(true);
+      await refresh(false);
+    },
+    async enqueueGoal(input: GoalInput) {
+      if (!scope) return;
+      await outbox.put(scope, { kind: 'create_goal', clientId: newClientId(), recordedAt: new Date().toISOString(), input, error: null });
+      setOffline(true);
+      await refresh(false);
+    },
+    async enqueueEvent(input: EventInput) {
+      if (!scope) return;
+      await outbox.put(scope, { kind: 'create_event', clientId: newClientId(), recordedAt: new Date().toISOString(), input, error: null });
+      setOffline(true);
+      await refresh(false);
+    },
+    async enqueueMilestone(goal: { id: string; title: string }, milestone: { title: string; dueOn: string | null; sortOrder: number }) {
+      if (!scope) return;
+      await outbox.put(scope, { kind: 'create_milestone', clientId: newClientId(), recordedAt: new Date().toISOString(), goalId: goal.id, goalTitle: goal.title, ...milestone, error: null });
+      setOffline(true);
+      await refresh(false);
+    },
+    async enqueueMilestoneStatus(milestone: Pick<Milestone, 'id' | 'title'>, status: Milestone['status']) {
+      if (!scope) return;
+      await outbox.put(scope, { kind: 'set_milestone', clientId: `milestone-${milestone.id}`, recordedAt: new Date().toISOString(), milestoneId: milestone.id, title: milestone.title, status, error: null });
       setOffline(true);
       await refresh(false);
     },

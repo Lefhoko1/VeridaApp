@@ -33,6 +33,7 @@ const task = (overrides: Partial<Task>): Task => ({
   completedOn: null,
   ruleId: null,
   occurrenceOn: null,
+  attachmentPaths: [],
   ...overrides,
 });
 

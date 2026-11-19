@@ -14,7 +14,7 @@ describe('EdgePlanAdvisor (Plan section 4.6)', () => {
     const invoke = jest.fn(async () => ({ data: { recommendationId: 'ai-1' }, error: null }));
     const { advisor, plan } = setup(invoke);
     expect(await advisor.suggest({ businessId: 'b', kind: 'goal_breakdown', goalId: 'g' })).toEqual({ suggestionId: 'ai-1', source: 'ai' });
-    expect(invoke).toHaveBeenCalledWith('plan-assist', { body: { businessId: 'b', kind: 'goal_breakdown', goalId: 'g', request: null } });
+    expect(invoke).toHaveBeenCalledWith('plan-assist', { body: { businessId: 'b', kind: 'goal_breakdown', goalId: 'g', request: null, insight: null } });
     expect(plan.suggestFromRules).not.toHaveBeenCalled();
   });
 
@@ -22,7 +22,7 @@ describe('EdgePlanAdvisor (Plan section 4.6)', () => {
     const invoke = jest.fn(async () => ({ data: null, error: { context: { status: 503 } } }));
     const { advisor, plan } = setup(invoke);
     expect(await advisor.suggest({ businessId: 'b', kind: 'weekly_plan', request: 'free mornings' })).toEqual({ suggestionId: 'rules-1', source: 'rules' });
-    expect(plan.suggestFromRules).toHaveBeenCalledWith('b', 'weekly_plan', null, 'free mornings');
+    expect(plan.suggestFromRules).toHaveBeenCalledWith('b', 'weekly_plan', null, 'free mornings', null);
   });
 
   it('does not retry with the rules when the person may not plan', async () => {

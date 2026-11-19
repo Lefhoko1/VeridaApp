@@ -14,7 +14,8 @@ export type ChatMessage = {
   confidence: AnswerConfidence | null;
 };
 
-export type CaptureTarget = 'sale' | 'expense' | 'activity';
+// A task opens the Plan module's task form (Plan specification, journey 5.1).
+export type CaptureTarget = 'sale' | 'expense' | 'activity' | 'task';
 
 export type AssistantAnswer = {
   text: string;

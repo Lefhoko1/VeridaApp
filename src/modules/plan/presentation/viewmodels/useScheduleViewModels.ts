@@ -33,6 +33,7 @@ import {
 } from '../../domain/schedule';
 import { eventFormSchema, reviewFormSchema, ruleUpdateSchema } from '../../domain/validation';
 import { PRIORITY_OPTIONS, goalCard, taskRow, useGoalsWithProgress, usePlanQueries } from './usePlanViewModels';
+import { isOffline, usePlanSync } from './usePlanSync';
 
 const options = <T extends string>(labels: Record<T, string>) => (Object.keys(labels) as T[]).map((value) => ({ value, label: labels[value] }));
 
@@ -63,6 +64,7 @@ export type ScheduleRow = {
 // the business's own.
 export function useScheduleViewModel() {
   const { plan, business, can, scope, enabled } = usePlanQueries();
+  const sync = usePlanSync();
   const members = useMemberOptions();
   const today = todayIso();
   const [view, setView] = useState<ScheduleView>('list');
@@ -115,6 +117,7 @@ export function useScheduleViewModel() {
     error: schedule.error ? errorMessage(schedule.error) : null,
     retry: () => void schedule.refetch(),
     canCreate: can('plan.tasks'),
+    sync,
     view,
     views: SCHEDULE_VIEWS,
     setView(value: string) {
@@ -146,10 +149,11 @@ export function useScheduleViewModel() {
 
 const NEW_EVENT = { title: '', description: '', eventType: 'other', startsOn: '', startTime: '', endTime: '', status: 'scheduled', repeat: 'none', intervalCount: '1', daysOfWeek: '', dayOfMonth: '', endsOn: '' };
 
-type EventFormArgs = { eventId?: string; onDate?: string; onDone: (id: string) => void; onSeriesCreated?: (ruleId: string) => void };
+type EventFormArgs = { eventId?: string; onDate?: string; onDone: (id: string) => void; onSeriesCreated?: (ruleId: string) => void; onQueued?: () => void };
 
-export function useEventFormViewModel({ eventId, onDate, onDone, onSeriesCreated }: EventFormArgs) {
+export function useEventFormViewModel({ eventId, onDate, onDone, onSeriesCreated, onQueued }: EventFormArgs) {
   const { plan, business, can, scope } = usePlanQueries();
+  const sync = usePlanSync();
   const feedback = useFeedback();
   const queryClient = useQueryClient();
   const form = useForm(eventFormSchema, { ...NEW_EVENT, startsOn: onDate ?? todayIso() });
@@ -203,7 +207,16 @@ export function useEventFormViewModel({ eventId, onDate, onDone, onSeriesCreated
       feedback.success(eventId ? 'Event updated.' : 'Event added to the schedule.');
       onDone(result.id);
     },
-    onError: (error) => feedback.error(errorMessage(error)),
+    onError: async (error, value) => {
+      // Section 8: a one-off event made without a connection waits on this device.
+      if (isOffline(error) && !eventId && value.repeat === 'none') {
+        await sync.enqueueEvent({ title: value.title, description: value.description, eventType: value.eventType, startsOn: value.startsOn, startTime: value.startTime, endTime: value.endTime, status: value.status });
+        feedback.success('No connection. Saved on this device; it will sync when you are back online.');
+        if (onQueued) onQueued();
+        return;
+      }
+      feedback.error(errorMessage(error));
+    },
   });
 
   return {

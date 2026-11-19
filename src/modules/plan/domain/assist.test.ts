@@ -1,4 +1,4 @@
-import { describeAction, describeOutboxItem, mergeOntoLatest } from './assist';
+import { describeAction, describeOutboxItem, mergeOntoLatest, questionAbout } from './assist';
 import type { TaskInput } from './models';
 
 const day = (iso: string) => `[${iso}]`;
@@ -25,6 +25,14 @@ describe('suggested actions (Plan section 4.6)', () => {
   });
 });
 
+describe('asking Verida about a suggestion (section 1 wireframe)', () => {
+  it('names the suggestion and its reason, for the person to send', () => {
+    expect(questionAbout({ title: 'This week' }, { verb: 'Add task', heading: 'Call two buyers', why: 'Sales are down.' })).toBe(
+      'Verida suggested "This week" for my plan. It proposes: add task "Call two buyers", because Sales are down. Can you explain whether this makes sense for my business and what I should check first?',
+    );
+  });
+});
+
 describe('offline changes (Plan section 8)', () => {
   const base: TaskInput = { title: 'Fix fence', description: null, priority: 'normal', status: 'not_started', dueOn: '2026-11-20', completionNote: null, blockerReason: null, assignedTo: null, goalIds: [] };
 
@@ -39,5 +47,8 @@ describe('offline changes (Plan section 8)', () => {
     const update = { kind: 'update' as const, clientId: 'u', recordedAt: '', taskId: 't', taskTitle: 'Fix fence', expectedVersion: 2, base, input: { ...base, status: 'completed' as const }, conflict: false, error: null };
     expect(describeOutboxItem(update).detail).toBe('Marked completed, waiting to sync');
     expect(describeOutboxItem({ ...update, conflict: true }).detail).toMatch(/Choose which version/);
+    expect(describeOutboxItem({ kind: 'create_milestone', clientId: 'm', recordedAt: '', goalId: 'g', goalTitle: 'Open a shop', title: 'Get quotes', dueOn: null, sortOrder: 1, error: null }).detail).toBe(
+      'New milestone for Open a shop, waiting to sync',
+    );
   });
 });
